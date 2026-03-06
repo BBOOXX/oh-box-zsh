@@ -17,6 +17,7 @@
 # ------------------------------
 (( ${+ZSH_KEYMAP} )) || typeset -g ZSH_KEYMAP="emacs"
 (( ${+ZSH_THEME} )) || typeset -g ZSH_THEME="basic"
+(( ${+HIST_STAMPS} )) || typeset -g HIST_STAMPS="yyyy-mm-dd"
 
 # ------------------------------
 # 模块列表默认值
