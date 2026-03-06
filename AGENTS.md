@@ -19,7 +19,7 @@
 - 禁止把大量业务逻辑堆进 `init.zsh`（它只做调度）。
 
 ### 1.2 必须项
-- `ZDOTDIR` 固定为：`$HOME/.config/zsh`
+- `ZDOTDIR` 规则：优先 `"$XDG_CONFIG_HOME/zsh"`，若未设置则回退到 `"$HOME/.config/zsh"`
 - 登录/交互分阶段：
   - `.zprofile` → `ZSH_INIT_STAGE=login` → `init.zsh`
   - `.zshrc`    → `ZSH_INIT_STAGE=interactive` → `init.zsh`
@@ -34,6 +34,7 @@
 推荐结构（节选）：
 
 - `install.sh`：部署脚本（link/copy + force 备份）
+- `test-local-zsh.sh`：本地集成测试脚本
 - `zshenv`：将被部署到 `~/.zshenv`（只设置 ZDOTDIR）
 - `zsh/`：ZDOTDIR 内容
   - `.zprofile` / `.zshrc` / `init.zsh`
@@ -50,6 +51,7 @@ init.zsh 负责：
 - 只做环境探测（detect）
 - 按阶段分发到 stages/*
 - 防重复（bootstrap guard + stage guard）
+
 除此以外的业务逻辑应放到：
 - `stages/`（阶段逻辑）
 - `modules/`（可选工具）
@@ -69,33 +71,53 @@ init.zsh 负责：
 ## 4. 开发/测试：默认使用“临时 HOME”验收（避免污染真实环境）
 
 ### 4.1 安全集成测试（推荐，默认执行）
-在仓库根执行（示例）：
+在仓库根执行：
 
 ```bash
 TMPHOME="$(mktemp -d)"
-# 用临时 HOME 安装（不会碰你真实 ~/.zshenv 和 ~/.config）
-HOME="$TMPHOME" ./install.sh --link --force
 
-# 验证三条启动路径都正确
-HOME="$TMPHOME" zsh -lc  'echo login:$ZDOTDIR'
-HOME="$TMPHOME" zsh -ic  'echo interactive:$ZDOTDIR'
-HOME="$TMPHOME" zsh -lic 'echo both:$ZDOTDIR'
+HOME="$TMPHOME" \
+XDG_CONFIG_HOME="$TMPHOME/.config" \
+./install.sh --link --force
 
-# 验证探测变量（仅示例：值会因平台不同）
-HOME="$TMPHOME" zsh -lic 'echo OS=$ZSH_OS ARCH=$ZSH_ARCH SSH=$ZSH_IS_SSH TERMUX=$ZSH_IS_TERMUX WSL=$ZSH_IS_WSL'
+HOME="$TMPHOME" \
+XDG_CONFIG_HOME="$TMPHOME/.config" \
+zsh -lc 'echo login:$ZDOTDIR'
 
-# 验证 history 文件路径
-HOME="$TMPHOME" zsh -lic 'echo HISTFILE=$HISTFILE'
-````
+HOME="$TMPHOME" \
+XDG_CONFIG_HOME="$TMPHOME/.config" \
+zsh -ic 'echo interactive:$ZDOTDIR'
+
+HOME="$TMPHOME" \
+XDG_CONFIG_HOME="$TMPHOME/.config" \
+zsh -lic 'echo both:$ZDOTDIR'
+
+HOME="$TMPHOME" \
+XDG_CONFIG_HOME="$TMPHOME/.config" \
+zsh -lic 'echo OS=$ZSH_OS ARCH=$ZSH_ARCH SSH=$ZSH_IS_SSH TERMUX=$ZSH_IS_TERMUX WSL=$ZSH_IS_WSL'
+
+HOME="$TMPHOME" \
+XDG_CONFIG_HOME="$TMPHOME/.config" \
+zsh -lic 'echo HISTFILE=$HISTFILE'
+```
 
 判定标准：
+- 命令退出码为 0
+- 三次输出的 `ZDOTDIR` 都等于：`$XDG_CONFIG_HOME/zsh`
+- 环境探测值符合平台基本事实（macOS/Linux + arch）
+- `HISTFILE` 在：`$HOME/.cache/zsh/history`
 
-* 命令退出码为 0
-* 三次输出的 ZDOTDIR 都等于：`$HOME/.config/zsh`
-* 环境探测值符合平台基本事实（macos/linux + arch）
-* HISTFILE 在：`$HOME/.cache/zsh/history`
+### 4.2 install.sh 的判定语义
+必须按下面规则写测试：
 
-### 4.2 真实环境安装（仅在我明确要求时执行）
+- 目标不存在：成功
+- 目标已存在且已正确：成功（幂等）
+- 目标已存在但冲突：失败
+- `--force`：备份后替换
+
+不要把“幂等成功”误判为失败。
+
+### 4.3 真实环境安装（仅在我明确要求时执行）
 
 ```bash
 ./install.sh --link --force
@@ -103,23 +125,19 @@ HOME="$TMPHOME" zsh -lic 'echo HISTFILE=$HISTFILE'
 ```
 
 注意：真实安装会改动：
-
-* `~/.zshenv`
-* `~/.config/zsh`
+- `~/.zshenv`
+- `~/.config/zsh` 或 `$XDG_CONFIG_HOME/zsh`
 
 ## 5. 代码风格与提交规则
 
-* shell 兼容目标：zsh（允许使用 zsh 特性，不要求 bash 兼容）。
-* 任何新增函数：
-
-  * 必须有“职责说明 + 输入输出约定 + 失败语义”注释
-  * 尽量避免隐式全局副作用
-* 文件命名：
-
-  * 基础库用数字前缀（00/10/20/30/40）确保加载顺序清晰
-* 变更输出（你给我的最终回复里应包含）：
-
-  1. 改动摘要（列表）
-  2. diff（或逐文件关键片段）
-  3. 你跑过的命令（尤其是 4.1 的临时 HOME 验证）
-  4. 结果（成功/失败 + 失败原因）
+- shell 兼容目标：zsh（允许使用 zsh 特性，不要求 bash 兼容）。
+- 任何新增函数：
+  - 必须有“职责说明 + 输入输出约定 + 失败语义”注释
+  - 尽量避免隐式全局副作用
+- 文件命名：
+  - 基础库用数字前缀（00/10/20/30/40）确保加载顺序清晰
+- 变更输出（你给我的最终回复里应包含）：
+  1) 改动摘要（列表）
+  2) diff（或逐文件关键片段）
+  3) 你跑过的命令（尤其是 4.1 的临时 HOME 验证）
+  4) 结果（成功/失败 + 失败原因）
