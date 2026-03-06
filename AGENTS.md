@@ -17,12 +17,15 @@
 - 禁用 oh-my-zsh / prezto 等框架；禁止引入其函数依赖。
 - 禁止在 `~/.zshenv` 放重逻辑（外部命令、compinit、git 探测、eval 等）。
 - 禁止把大量业务逻辑堆进 `init.zsh`（它只做调度）。
+- 禁止把“用户主配置入口”重新分散到 `conf/*`。
 
 ### 1.2 必须项
 - `ZDOTDIR` 规则：优先 `"$XDG_CONFIG_HOME/zsh"`，若未设置则回退到 `"$HOME/.config/zsh"`
 - 登录/交互分阶段：
   - `.zprofile` → `ZSH_INIT_STAGE=login` → `init.zsh`
   - `.zshrc`    → `ZSH_INIT_STAGE=interactive` → `init.zsh`
+- 用户主配置入口固定为：`zsh/config.zsh`
+- 本机私有配置入口固定为：`zsh/config.local.zsh`
 - 跨平台：macOS / Linux（含 arm64/x86_64），必要时做分支兼容。
 - 注释风格：中文为主，解释“为什么这么做”，尤其是 cache/lazy 这类基础设施。
 
@@ -31,16 +34,19 @@
 - 仓库根目录用于管理（git/README/install），**不作为 ZDOTDIR**。
 - 真正的 zsh 配置目录是仓库内的 `zsh/` 子目录。
 
-推荐结构（节选）：
+当前结构（节选）：
 
 - `install.sh`：部署脚本（link/copy + force 备份）
 - `test-local-zsh.sh`：本地集成测试脚本
 - `zshenv`：将被部署到 `~/.zshenv`（只设置 ZDOTDIR）
-- `zsh/`：ZDOTDIR 内容
-  - `.zprofile` / `.zshrc` / `init.zsh`
-  - `lib/00-core.zsh` `10-path.zsh` `20-detect.zsh` `30-cache.zsh` `40-lazy.zsh`
-  - `stages/login.zsh` `stages/interactive.zsh`
-  - `modules/`：可选模块（homebrew/pyenv/tmux/...）
+- `zsh/config.defaults.zsh`：框架默认值
+- `zsh/config.zsh`：用户主配置入口（平时优先改这里）
+- `zsh/config.local.zsh`：本机私有覆盖入口（可选）
+- `zsh/local.zsh`：最后加载的任意自定义代码（可选）
+- `zsh/conf/`：zsh 行为实现
+- `zsh/modules/`：可选模块（homebrew/pyenv/tmux/...）
+- `zsh/lib/`：基础能力
+- `zsh/stages/`：阶段调度
 
 ## 3. 关键设计原则（写代码时必须遵守）
 
@@ -49,21 +55,34 @@ init.zsh 负责：
 - 定义目录变量（ZSH_CONFIG_HOME / ZSH_CACHE_DIR / ...）
 - 只加载基础库（lib/*）
 - 只做环境探测（detect）
+- 只加载配置层（defaults → config → config.local）
 - 按阶段分发到 stages/*
 - 防重复（bootstrap guard + stage guard）
 
 除此以外的业务逻辑应放到：
 - `stages/`（阶段逻辑）
 - `modules/`（可选工具）
-- `conf/`（纯配置片段，未来可用）
+- `conf/`（纯实现，不作为用户主要配置入口）
 
-### 3.2 重逻辑必须可控
+### 3.2 用户入口与实现分离
+- `config.zsh` 放：开关、偏好、模块列表、模块参数。
+- `config.local.zsh` 放：本机私有覆盖。
+- `conf/*` 放：这些配置值如何被消费与实现。
+- `modules/*` 放：外部工具接入逻辑。
+
+### 3.3 重逻辑必须可控
 - 任何“外部命令 + eval/source”倾向：
   - 优先接入 `lib/30-cache.zsh`（缓存 shell 片段）
 - 任何“初始化很重的工具链”（pyenv/nvm/...）：
   - 优先接入 `lib/40-lazy.zsh`（首次调用再初始化）
 
-### 3.3 安全边界
+### 3.4 模块加载规则
+- 模块按名字声明在数组中，不使用一堆 `ZSH_ENABLE_XXX`。
+- `ZSH_LOGIN_MODULES`：login 阶段加载
+- `ZSH_INTERACTIVE_MODULES`：interactive 阶段加载
+- loader 只做“按名字加载”，模块具体逻辑下沉到 `modules/*.zsh`
+
+### 3.5 安全边界
 - `zcache_source_cmd` 只能用于“可信命令输出的 shell 片段”。
 - 禁止缓存/落盘/`source` 不可信输入。
 - 若必须 `eval`，必须说明风险与替代方案。
@@ -136,6 +155,7 @@ zsh -lic 'echo HISTFILE=$HISTFILE'
   - 尽量避免隐式全局副作用
 - 文件命名：
   - 基础库用数字前缀（00/10/20/30/40）确保加载顺序清晰
+  - 模块文件按模块名命名（例如 `homebrew.zsh` `pyenv.zsh`）
 - 变更输出（你给我的最终回复里应包含）：
   1) 改动摘要（列表）
   2) diff（或逐文件关键片段）

@@ -7,12 +7,12 @@
 # 1) 只放轻量 基础 一次性的环境设置
 # 2) 不放交互体验配置
 # 3) 不放重初始化
-# 4) 不放第三方工具接入
+# 4) 不直接写第三方工具细节，模块接入统一交给 modules loader
 
 # 也就是说
 # - 可以做 PATH 基础组装
 # - 可以设编辑器/分页器之类的基础环境变量
-# - 不要做 prompt / completion / pyenv / brew 等重逻辑
+# - 不要直接在这里写 prompt / completion / pyenv / brew 的具体逻辑
 
 # 记录调试信息
 zsh_log_debug "login stage start"
@@ -84,5 +84,9 @@ export LESS="${LESS:--R}"
 # ^ 给 less 一个保守默认参数
 #   -R 表示允许显示原始颜色控制字符 (但仍保守处理)
 
+# login 阶段的外部工具模块
+zsh_source_optional "$ZSH_CONF_DIR/modules-login.zsh"
+
 # 调试输出结束
 zsh_log_debug "login stage done"
+

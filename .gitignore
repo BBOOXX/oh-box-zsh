@@ -15,6 +15,5 @@ zsh/*.zwc
 zsh/*.zwc.old
 zsh/*.zwc.new
 
+zsh/config.local.zsh
 zsh/local.zsh
-zsh/local.*.zsh
-zsh/local.features.zsh

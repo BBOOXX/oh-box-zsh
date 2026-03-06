@@ -12,7 +12,7 @@ zsh_log_debug "interactive stage start"
 # --------------------------------------------------
 # 按开关分发 conf 模块
 # --------------------------------------------------
-# 开关值统一由 conf/features.zsh 提供默认值与覆写点。
+# 开关值统一由 config.defaults.zsh / config.zsh / config.local.zsh 提供。
 # 这里不再重复定义默认值，避免默认来源分散造成维护漂移。
 # 原则：stage 只做“是否加载”的决策，不承载具体实现细节。
 # 具体行为（history setopt / compinit / bindkey / prompt）都在 conf/* 中维护。
@@ -36,5 +36,8 @@ fi
 if (( ZSH_ENABLE_PROMPT )); then
   zsh_source_optional "$ZSH_CONF_DIR/prompt.zsh"
 fi
+
+# interactive 阶段的外部工具模块
+zsh_source_optional "$ZSH_CONF_DIR/modules-interactive.zsh"
 
 zsh_log_debug "interactive stage done"

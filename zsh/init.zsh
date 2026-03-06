@@ -89,7 +89,10 @@ if [[ -z "${__zsh_framework_bootstrapped:-}" ]]; then
     zsh_detect_env
   fi
 
-  zsh_source_optional "$ZSH_CONF_DIR/features.zsh"
+  # 加载配置层：默认值 -> 用户主配置 -> 本机私有覆盖
+  zsh_source_optional "$ZSH_CONFIG_HOME/config.defaults.zsh"
+  zsh_source_optional "$ZSH_CONFIG_HOME/config.zsh"
+  zsh_source_optional "$ZSH_CONFIG_HOME/config.local.zsh"
 
   # 标记框架基础引导已经完成
   # 后续同一个 shell 再次 source init.zsh 时就不会重复跑这部分

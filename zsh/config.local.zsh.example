@@ -1,0 +1,11 @@
+# config.local.zsh.example
+# 本机私有覆盖示例：复制为 config.local.zsh 后按需修改
+
+# 例：某台机器开启 completion
+# typeset -gi ZSH_ENABLE_COMPLETION=1
+
+# 例：切到 vi 模式
+# typeset -g ZSH_KEYMAP="vi"
+
+# 例：为当前机器追加模块
+# ZSH_INTERACTIVE_MODULES+=(fzf)
