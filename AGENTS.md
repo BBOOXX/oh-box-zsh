@@ -26,6 +26,7 @@
   - `.zshrc`    → `ZSH_INIT_STAGE=interactive` → `init.zsh`
 - 用户主配置入口固定为：`zsh/config.zsh`
 - 本机私有配置入口固定为：`zsh/config.local.zsh`
+- 框架默认值固定为：`zsh/conf/defaults.zsh`
 - 跨平台：macOS / Linux（含 arm64/x86_64），必要时做分支兼容。
 - 注释风格：中文为主，解释“为什么这么做”，尤其是 cache/lazy 这类基础设施。
 
@@ -39,7 +40,7 @@
 - `install.sh`：部署脚本（link/copy + force 备份）
 - `test-local-zsh.sh`：本地集成测试脚本
 - `zshenv`：将被部署到 `~/.zshenv`（只设置 ZDOTDIR）
-- `zsh/config.defaults.zsh`：框架默认值
+- `zsh/conf/defaults.zsh`：框架默认值（内部兜底层）
 - `zsh/config.zsh`：用户主配置入口（平时优先改这里）
 - `zsh/config.local.zsh`：本机私有覆盖入口（可选）
 - `zsh/local.zsh`：最后加载的任意自定义代码（可选）
@@ -55,18 +56,19 @@ init.zsh 负责：
 - 定义目录变量（ZSH_CONFIG_HOME / ZSH_CACHE_DIR / ...）
 - 只加载基础库（lib/*）
 - 只做环境探测（detect）
-- 只加载配置层（defaults → config → config.local）
+- 只加载配置层（conf/defaults → config → config.local）
 - 按阶段分发到 stages/*
 - 防重复（bootstrap guard + stage guard）
 
 除此以外的业务逻辑应放到：
 - `stages/`（阶段逻辑）
 - `modules/`（可选工具）
-- `conf/`（纯实现，不作为用户主要配置入口）
+- `conf/`（纯实现，含默认值兜底层，但不作为用户主要配置入口）
 
 ### 3.2 用户入口与实现分离
 - `config.zsh` 放：开关、偏好、模块列表、模块参数。
 - `config.local.zsh` 放：本机私有覆盖。
+- `conf/defaults.zsh` 放：框架兜底默认值。
 - `conf/*` 放：这些配置值如何被消费与实现。
 - `modules/*` 放：外部工具接入逻辑。
 
@@ -118,21 +120,23 @@ zsh -lic 'echo OS=$ZSH_OS ARCH=$ZSH_ARCH SSH=$ZSH_IS_SSH TERMUX=$ZSH_IS_TERMUX W
 HOME="$TMPHOME" \
 XDG_CONFIG_HOME="$TMPHOME/.config" \
 zsh -lic 'echo HISTFILE=$HISTFILE'
-```
+````
 
 判定标准：
-- 命令退出码为 0
-- 三次输出的 `ZDOTDIR` 都等于：`$XDG_CONFIG_HOME/zsh`
-- 环境探测值符合平台基本事实（macOS/Linux + arch）
-- `HISTFILE` 在：`$HOME/.cache/zsh/history`
+
+* 命令退出码为 0
+* 三次输出的 `ZDOTDIR` 都等于：`$XDG_CONFIG_HOME/zsh`
+* 环境探测值符合平台基本事实（macOS/Linux + arch）
+* `HISTFILE` 在：`$HOME/.cache/zsh/history`
 
 ### 4.2 install.sh 的判定语义
+
 必须按下面规则写测试：
 
-- 目标不存在：成功
-- 目标已存在且已正确：成功（幂等）
-- 目标已存在但冲突：失败
-- `--force`：备份后替换
+* 目标不存在：成功
+* 目标已存在且已正确：成功（幂等）
+* 目标已存在但冲突：失败
+* `--force`：备份后替换
 
 不要把“幂等成功”误判为失败。
 
@@ -144,20 +148,24 @@ zsh -lic 'echo HISTFILE=$HISTFILE'
 ```
 
 注意：真实安装会改动：
-- `~/.zshenv`
-- `~/.config/zsh` 或 `$XDG_CONFIG_HOME/zsh`
+
+* `~/.zshenv`
+* `~/.config/zsh` 或 `$XDG_CONFIG_HOME/zsh`
 
 ## 5. 代码风格与提交规则
 
-- shell 兼容目标：zsh（允许使用 zsh 特性，不要求 bash 兼容）。
-- 任何新增函数：
-  - 必须有“职责说明 + 输入输出约定 + 失败语义”注释
-  - 尽量避免隐式全局副作用
-- 文件命名：
-  - 基础库用数字前缀（00/10/20/30/40）确保加载顺序清晰
-  - 模块文件按模块名命名（例如 `homebrew.zsh` `pyenv.zsh`）
-- 变更输出（你给我的最终回复里应包含）：
-  1) 改动摘要（列表）
-  2) diff（或逐文件关键片段）
-  3) 你跑过的命令（尤其是 4.1 的临时 HOME 验证）
-  4) 结果（成功/失败 + 失败原因）
+* shell 兼容目标：zsh（允许使用 zsh 特性，不要求 bash 兼容）。
+* 任何新增函数：
+
+  * 必须有“职责说明 + 输入输出约定 + 失败语义”注释
+  * 尽量避免隐式全局副作用
+* 文件命名：
+
+  * 基础库用数字前缀（00/10/20/30/40）确保加载顺序清晰
+  * 模块文件按模块名命名（例如 `homebrew.zsh` `pyenv.zsh`）
+* 变更输出（你给我的最终回复里应包含）：
+
+  1. 改动摘要（列表）
+  2. diff（或逐文件关键片段）
+  3. 你跑过的命令（尤其是 4.1 的临时 HOME 验证）
+  4. 结果（成功/失败 + 失败原因）

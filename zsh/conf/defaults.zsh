@@ -1,5 +1,8 @@
-# config.defaults.zsh
-# 框架默认值：只负责提供兜底，不作为日常编辑入口
+# conf/defaults.zsh
+# 框架内部默认值层：
+# - 只负责兜底
+# - 不作为日常编辑入口
+# - 用户配置请写到 config.zsh / config.local.zsh
 
 # ------------------------------
 # 内建 zsh 行为开关

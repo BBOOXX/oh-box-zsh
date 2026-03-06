@@ -89,8 +89,11 @@ if [[ -z "${__zsh_framework_bootstrapped:-}" ]]; then
     zsh_detect_env
   fi
 
-  # 加载配置层：默认值 -> 用户主配置 -> 本机私有覆盖
-  zsh_source_optional "$ZSH_CONFIG_HOME/config.defaults.zsh"
+  # 配置层加载顺序：
+  # 1) conf/defaults.zsh：框架内部默认值
+  # 2) config.zsh：用户主配置入口
+  # 3) config.local.zsh：本机私有覆盖
+  zsh_source_optional "$ZSH_CONF_DIR/defaults.zsh"
   zsh_source_optional "$ZSH_CONFIG_HOME/config.zsh"
   zsh_source_optional "$ZSH_CONFIG_HOME/config.local.zsh"
 
@@ -156,7 +159,7 @@ case "$ZSH_INIT_STAGE" in
 esac
 
 # -----------------------
-# 预留：本地私有覆盖文件
+# 预留：任意自定义代码入口
 # -----------------------
 
 # 这里不强制要求 local.zsh 存在

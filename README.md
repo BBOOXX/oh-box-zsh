@@ -15,7 +15,7 @@
 
 内部实现目录默认不需要日常编辑：
 
-- `zsh/conf/`：zsh 行为实现
+- `zsh/conf/`：zsh 行为实现与内部默认值
 - `zsh/modules/`：外部工具模块
 - `zsh/lib/`：基础能力
 - `zsh/stages/`：启动阶段调度
@@ -24,19 +24,26 @@
 
 ```text
 zsh/
-├── config.defaults.zsh
 ├── config.zsh
 ├── config.local.zsh
 ├── init.zsh
 ├── .zprofile
 ├── .zshrc
 ├── conf/
+│   ├── defaults.zsh
+│   ├── history.zsh
+│   ├── completion.zsh
+│   ├── keybinds.zsh
+│   ├── prompt.zsh
+│   ├── modules-common.zsh
+│   ├── modules-login.zsh
+│   └── modules-interactive.zsh
 ├── modules/
 ├── lib/
 ├── stages/
 ├── themes/
 └── local.zsh
-```
+````
 
 ## 启动顺序
 
@@ -45,7 +52,7 @@ zshenv
   -> ZDOTDIR
   -> init.zsh
   -> lib/*
-  -> config.defaults.zsh
+  -> conf/defaults.zsh
   -> config.zsh
   -> config.local.zsh (optional)
   -> stages/login.zsh or stages/interactive.zsh
@@ -77,5 +84,6 @@ chmod +x ./test-local-zsh.sh
 
 以下文件默认不进版本控制：
 
-- `zsh/config.local.zsh`
-- `zsh/local.zsh`
+* `zsh/config.local.zsh`
+* `zsh/local.zsh`
+

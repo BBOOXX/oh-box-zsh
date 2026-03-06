@@ -149,7 +149,7 @@ assert_file "$REPO_ROOT/install.sh" "install.sh 存在"
 assert_file "$REPO_ROOT/zshenv" "zshenv 存在"
 assert_dir  "$REPO_ROOT/zsh" "zsh 目录存在"
 assert_file "$REPO_ROOT/zsh/init.zsh" "init.zsh 存在"
-assert_file "$REPO_ROOT/zsh/config.defaults.zsh" "config.defaults.zsh 存在"
+assert_file "$REPO_ROOT/zsh/conf/defaults.zsh" "conf/defaults.zsh 存在"
 assert_file "$REPO_ROOT/zsh/config.zsh" "config.zsh 存在"
 
 log STEP "可选 shellcheck"
@@ -170,7 +170,9 @@ log STEP "zsh -n 语法检查"
 SYNTAX_LIST_FILE="${TMPDIR:-/tmp}/oh_box_zsh_syntax_list.$$"
 : > "$SYNTAX_LIST_FILE"
 
-find "$REPO_ROOT/zsh" -type f | sort >> "$SYNTAX_LIST_FILE"
+find "$REPO_ROOT/zsh" -type f \
+  \( -name '*.zsh' -o -name '.zprofile' -o -name '.zshrc' \) \
+  | sort >> "$SYNTAX_LIST_FILE"
 printf '%s\n' "$REPO_ROOT/zshenv" >> "$SYNTAX_LIST_FILE"
 
 while IFS= read -r file_path; do
