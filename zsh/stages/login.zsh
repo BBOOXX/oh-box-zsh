@@ -7,7 +7,7 @@
 # 1) 只放轻量 基础 一次性的环境设置
 # 2) 不放交互体验配置
 # 3) 不放重初始化
-# 4) 不直接写第三方工具细节，模块接入统一交给 modules loader
+# 4) 不直接写第三方工具细节 模块接入统一交给 modules loader
 
 # 也就是说
 # - 可以做 PATH 基础组装
@@ -47,7 +47,7 @@ path_prepend "$HOME/bin"
 # - /usr/local/bin
 # - /usr/local/sbin
 
-# 注意：
+# 注意
 # 这里先用 append 而不是 prepend
 # 因为用户级目录 如 ~/.local/bin 通常更应该有更高优先级
 if [[ "${ZSH_IS_MACOS:-0}" -eq 1 ]]; then

@@ -1,11 +1,11 @@
 # stages/interactive.zsh
-# interactive 阶段初始化：只做调度，按功能开关加载 conf 片段
+# interactive 阶段初始化 只做调度 按功能开关加载 conf 片段
 
-# 这个阶段只在交互式 shell 执行。
-# 目标：把“具体业务逻辑”下沉到 conf/*，这里保持可读、可回滚的调度层。
-# 好处：
+# 这个阶段只在交互式 shell 执行
+# 目标 把 具体业务逻辑 下沉到 conf/* 这里保持可读 可回滚的调度层
+# 好处
 # 1) 一眼可见当前 interactive 阶段做了哪些事
-# 2) 每个能力都可单独开关，便于排障与性能对比
+# 2) 每个能力都可单独开关 便于排障与性能对比
 # 3) 避免把大量细节塞回 init.zsh / stage 文件
 zsh_log_debug "interactive stage start"
 

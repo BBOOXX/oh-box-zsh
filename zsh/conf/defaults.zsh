@@ -1,5 +1,5 @@
 # conf/defaults.zsh
-# 框架内部默认值层：
+# 框架内部默认值层
 # - 只负责兜底
 # - 不作为日常编辑入口
 # - 用户配置请写到 config.zsh / config.local.zsh
