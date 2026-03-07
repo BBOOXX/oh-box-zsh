@@ -1,9 +1,9 @@
-# local.zsh.example
+# config.zsh.example
 # 用户主配置入口示例：
-# 复制为 local.zsh 后按需修改
+# 复制为 config.zsh 后按需修改
 #
 # 说明：
-# - local.zsh 只在 interactive 阶段加载
+# - config.zsh 只在 interactive 阶段加载
 # - login 阶段不会读取这个文件
 # - 可以写值覆盖，也可以写 alias / function / 临时代码
 
@@ -37,7 +37,7 @@
 # 3) 覆盖模块列表
 # ==================================================
 
-# 例：登录阶段模块（注意：interactive 才读 local.zsh，
+# 例：登录阶段模块（注意：interactive 才读 config.zsh，
 # 这里改 ZSH_LOGIN_MODULES 不会反向影响已经执行过的 login 阶段）
 # typeset -ga ZSH_LOGIN_MODULES
 # ZSH_LOGIN_MODULES=(homebrew pyenv)
@@ -65,4 +65,4 @@
 
 # alias ll='ls -lh'
 # function mkcd() { mkdir -p -- "$1" && cd -- "$1" }
-# typeset -g LOCAL_MARK="loaded_from_local"
+# typeset -g CONFIG_MARK="loaded_from_config"

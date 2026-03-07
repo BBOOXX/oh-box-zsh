@@ -56,7 +56,7 @@ if [[ -z "${__zsh_framework_bootstrapped:-}" ]]; then
 
   # 配置层加载顺序：
   # 1) components/defaults.zsh：项目默认配置中心
-  # local.zsh 不在这里加载
+  # config.zsh 不在这里加载
   # 它只属于 interactive 阶段的用户主配置入口
   zsh_source_optional "$ZSH_COMPONENT_DIR/defaults.zsh"
 

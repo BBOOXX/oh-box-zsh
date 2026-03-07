@@ -24,9 +24,9 @@
 - 登录/交互分阶段：
   - `.zprofile` → `ZSH_INIT_STAGE=login` → `init.zsh`
   - `.zshrc`    → `ZSH_INIT_STAGE=interactive` → `init.zsh`
-- 用户主配置入口固定为：`zsh/local.zsh`
+- 用户主配置入口固定为：`zsh/config.zsh`
 - 项目默认配置固定为：`zsh/components/defaults.zsh`
-- `local.zsh` 只在 interactive 阶段加载
+- `config.zsh` 只在 interactive 阶段加载
 - 跨平台：macOS / Linux（含 arm64/x86_64），必要时做分支兼容。
 - 注释风格：中文为主，解释“为什么这么做”，尤其是 cache/lazy 这类基础设施。
 
@@ -38,11 +38,11 @@
 当前结构（节选）：
 
 - `install.sh`：部署脚本（link/copy + force 备份）
-- `test-local-zsh.sh`：本地集成测试脚本
+- `test-config-zsh.sh`：本地集成测试脚本
 - `zshenv`：将被部署到 `~/.zshenv`（只设置 ZDOTDIR）
 - `zsh/components/defaults.zsh`：项目默认配置中心
-- `zsh/local.zsh`：用户主配置入口（可选）
-- `zsh/local.zsh.example`：用户主配置示例
+- `zsh/config.zsh`：用户主配置入口（可选）
+- `zsh/config.zsh.example`：用户主配置示例
 - `zsh/components/`：zsh 行为实现与模块加载器
 - `zsh/modules/`：可选模块（homebrew/pyenv/tmux/...）
 - `zsh/lib/`：基础能力
@@ -65,7 +65,7 @@ init.zsh 负责：
 - `components/`（纯实现与组件加载器）
 
 ### 3.2 用户入口与实现分离
-- `local.zsh` 放：开关、偏好、模块列表、模块参数、alias/function/临时代码。
+- `config.zsh` 放：开关、偏好、模块列表、模块参数、alias/function/临时代码。
 - `components/defaults.zsh` 放：项目默认配置。
 - `components/*` 放：这些配置值如何被消费与实现。
 - `modules/*` 放：外部工具接入逻辑。

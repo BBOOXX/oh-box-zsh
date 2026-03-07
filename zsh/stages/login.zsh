@@ -5,7 +5,7 @@
 # 原则：
 # 1) 只放轻量、基础、一次性的环境设置
 # 2) 不放交互体验配置
-# 3) 不放用户主配置入口 local.zsh
+# 3) 不放用户主配置入口 config.zsh
 # 4) 不直接写第三方工具细节，模块接入统一交给 module loader
 
 zsh_log_debug "login stage start"

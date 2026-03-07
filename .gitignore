@@ -15,4 +15,4 @@ zsh/*.zwc
 zsh/*.zwc.old
 zsh/*.zwc.new
 
-zsh/local.zsh
+zsh/config.zsh

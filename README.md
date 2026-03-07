@@ -11,8 +11,8 @@
 
 ## 当前结构
 
-- `zsh/local.zsh`：用户主配置入口，只在 interactive 阶段加载
-- `zsh/local.zsh.example`：用户主配置示例
+- `zsh/config.zsh`：用户主配置入口，只在 interactive 阶段加载
+- `zsh/config.zsh.example`：用户主配置示例
 - `zsh/components/defaults.zsh`：项目默认配置中心
 - `zsh/components/`：zsh 行为实现组件与模块加载器
 - `zsh/modules/`：可选模块目录
@@ -23,14 +23,14 @@
 ```text
 .
 ├── install.sh
-├── test-local-zsh.sh
+├── test-config-zsh.sh
 ├── zshenv
 └── zsh/
     ├── .zprofile
     ├── .zshrc
     ├── init.zsh
-    ├── local.zsh
-    ├── local.zsh.example
+    ├── config.zsh
+    ├── config.zsh.example
     ├── components/
     │   ├── defaults.zsh
     │   ├── history.zsh
@@ -57,7 +57,7 @@ zshenv
   -> stages/login.zsh or stages/interactive.zsh
 
 interactive 阶段内部：
-  -> local.zsh (optional)
+  -> config.zsh (optional)
   -> components/history.zsh
   -> components/completion.zsh
   -> components/keybinds.zsh
@@ -68,9 +68,9 @@ interactive 阶段内部：
 关键语义：
 
 - `defaults.zsh` 是项目默认配置
-- `local.zsh` 是用户主配置入口
-- `login` 不读取 `local.zsh`
-- `interactive` 才读取 `local.zsh`
+- `config.zsh` 是用户主配置入口
+- `login` 不读取 `config.zsh`
+- `interactive` 才读取 `config.zsh`
 
 ## 安装
 
@@ -89,12 +89,12 @@ interactive 阶段内部：
 ## 验证
 
 ```bash
-chmod +x ./test-local-zsh.sh
-./test-local-zsh.sh
+chmod +x ./test-config-zsh.sh
+./test-config-zsh.sh
 ```
 
 ## 本地私有文件
 
 以下文件默认不进版本控制：
 
-- `zsh/local.zsh`
+- `zsh/config.zsh`
