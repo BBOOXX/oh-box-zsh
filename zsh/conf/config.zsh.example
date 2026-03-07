@@ -1,0 +1,51 @@
+# 用户声明式配置示例.
+#
+# 这份示例文件的用途是告诉你, 哪些内容应该写到 user/config.zsh.
+# 规则非常明确.
+# 1. 这里应该只放声明式配置.
+# 2. 它会在 login 和 interactive 两个阶段之前加载.
+# 3. 不要把 alias, function, 临时代码放进来.
+#
+# feature 列表的顺序有意义.
+# 数组里谁排前面, 谁就先加载.
+# 所以如果你希望先跑 homebrew 再跑 completion, 就把 homebrew 放前面.
+
+# 示例 1. login 阶段接入基础环境能力.
+# typeset -ga ZSH_LOGIN_FEATURES
+# ZSH_LOGIN_FEATURES=(
+#   env-path
+#   homebrew
+#   pyenv
+# )
+
+# 示例 2. interactive 阶段接入交互能力.
+# typeset -ga ZSH_INTERACTIVE_FEATURES
+# ZSH_INTERACTIVE_FEATURES=(
+#   history
+#   completion
+#   keybinds
+#   prompt
+#   fzf
+#   tmux
+#   pyenv
+# )
+
+# 示例 3. 主题与编辑模式.
+# ZSH_THEME="basic"
+# ZSH_THEME="basic-git"
+# ZSH_KEYMAP="emacs"
+# ZSH_KEYMAP="vi"
+
+# 示例 4. homebrew shellenv 缓存时间, 单位秒.
+# ZSH_HOMEBREW_SHELLENV_TTL=86400
+
+# 示例 5. pyenv.
+# 默认 lazy 模式会在第一次真正调用相关命令时再执行 pyenv init - zsh.
+# 如果你不想懒加载, 可以改成 0.
+# ZSH_PYENV_LAZY=1
+# ZSH_PYENV_INIT_COMMANDS="pyenv"
+
+# 示例 6. tmux 自动附着.
+# 默认关闭.
+# ZSH_TMUX_AUTO_ATTACH=1
+# ZSH_TMUX_SESSION="main"
