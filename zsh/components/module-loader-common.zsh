@@ -1,4 +1,4 @@
-# conf/modules-common.zsh
+# components/module-loader-common.zsh
 # 模块公共加载函数：按名字从 modules/ 目录加载
 
 zsh_load_named_module() {

@@ -1,4 +1,4 @@
-# conf/history.zsh
+# components/history.zsh
 # 历史记录策略
 
 # 先确保缓存目录存在 避免 HISTFILE 指向不存在目录导致写入失败

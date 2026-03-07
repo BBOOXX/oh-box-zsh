@@ -1,4 +1,4 @@
-# conf/prompt.zsh
+# components/prompt.zsh
 # 提示符入口 颜色 主题目录 按主题名加载与回退
 
 # 启用颜色支持 供主题使用

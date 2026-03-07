@@ -149,8 +149,8 @@ assert_file "$REPO_ROOT/install.sh" "install.sh 存在"
 assert_file "$REPO_ROOT/zshenv" "zshenv 存在"
 assert_dir  "$REPO_ROOT/zsh" "zsh 目录存在"
 assert_file "$REPO_ROOT/zsh/init.zsh" "init.zsh 存在"
-assert_file "$REPO_ROOT/zsh/conf/defaults.zsh" "conf/defaults.zsh 存在"
-assert_file "$REPO_ROOT/zsh/config.zsh" "config.zsh 存在"
+assert_file "$REPO_ROOT/zsh/components/defaults.zsh" "components/defaults.zsh 存在"
+assert_file "$REPO_ROOT/zsh/local.zsh.example" "local.zsh.example 存在"
 
 log STEP "可选 shellcheck"
 if command -v shellcheck >/dev/null 2>&1; then
@@ -356,18 +356,43 @@ assert_file "$COPY_XDG/zsh/init.zsh" "copy 模式下 init.zsh 已复制"
 
 log STEP "copy 模式下本地覆盖测试"
 
-cat > "$COPY_XDG/zsh/config.local.zsh" <<'EOCONFIGLOCAL'
+cat > "$COPY_XDG/zsh/local.zsh" <<'EOLOCAL'
 typeset -gi ZSH_ENABLE_HISTORY=0
 typeset -gi ZSH_ENABLE_COMPLETION=0
 typeset -gi ZSH_ENABLE_KEYBINDS=0
 typeset -gi ZSH_ENABLE_PROMPT=0
 typeset -g ZSH_KEYMAP=vi
 typeset -g ZSH_THEME=basic
-EOCONFIGLOCAL
-
-cat > "$COPY_XDG/zsh/local.zsh" <<'EOLOCAL'
 typeset -g LOCAL_MARK="loaded_from_local"
 EOLOCAL
+
+SMOKE_COPY_L_SCRIPT='
+print -r -- "LOCAL_MARK=${LOCAL_MARK:-}"
+print -r -- "FEATURES=${ZSH_ENABLE_HISTORY:-}/${ZSH_ENABLE_COMPLETION:-}/${ZSH_ENABLE_KEYBINDS:-}/${ZSH_ENABLE_PROMPT:-}"
+print -r -- "KEYMAP=${ZSH_KEYMAP:-}"
+print -r -- "THEME=${ZSH_THEME:-}"
+print -r -- "LOGIN_STAGE=${__zsh_stage_loaded[login]:-0}"
+'
+
+if run_capture COPY_L_OUT env -i \
+  HOME="$COPY_HOME" \
+  XDG_CONFIG_HOME="$COPY_XDG" \
+  PATH="$PATH" \
+  TERM="${TERM:-xterm-256color}" \
+  "$ZSH_BIN" -lc "$SMOKE_COPY_L_SCRIPT"
+then
+  print_block "zsh -lc (copy + local should not load)" "$COPY_L_OUT"
+  pass "copy 模式下 login-only 测试启动成功"
+else
+  print_block "zsh -lc (copy + local should not load)" "$COPY_L_OUT"
+  fail "copy 模式下 login-only 测试启动失败"
+fi
+
+assert_contains "$COPY_L_OUT" "LOCAL_MARK=" "login 阶段不应加载 local.zsh"
+assert_contains "$COPY_L_OUT" "FEATURES=1/0/1/1" "login 阶段仍使用 defaults 功能开关"
+assert_contains "$COPY_L_OUT" "KEYMAP=emacs" "login 阶段仍使用 defaults keymap"
+assert_contains "$COPY_L_OUT" "THEME=basic" "login 阶段仍使用 defaults theme"
+assert_contains "$COPY_L_OUT" "LOGIN_STAGE=1" "copy 模式 login 阶段执行成功"
 
 SMOKE_COPY_I_SCRIPT='
 print -r -- "LOCAL_MARK=${LOCAL_MARK:-}"
@@ -391,10 +416,10 @@ else
   fail "copy 模式下本地覆盖测试启动失败"
 fi
 
-assert_contains "$COPY_I_OUT" "LOCAL_MARK=loaded_from_local" "local.zsh 已被加载"
-assert_contains "$COPY_I_OUT" "FEATURES=0/0/0/0" "config.local.zsh 覆盖开关成功"
-assert_contains "$COPY_I_OUT" "KEYMAP=vi" "config.local.zsh 覆盖 keymap 成功"
-assert_contains "$COPY_I_OUT" "THEME=basic" "config.local.zsh 覆盖 theme 成功"
+assert_contains "$COPY_I_OUT" "LOCAL_MARK=loaded_from_local" "interactive 阶段已加载 local.zsh"
+assert_contains "$COPY_I_OUT" "FEATURES=0/0/0/0" "local.zsh 覆盖开关成功"
+assert_contains "$COPY_I_OUT" "KEYMAP=vi" "local.zsh 覆盖 keymap 成功"
+assert_contains "$COPY_I_OUT" "THEME=basic" "local.zsh 覆盖 theme 成功"
 assert_contains "$COPY_I_OUT" "INT_STAGE=1" "copy 模式 interactive 阶段执行成功"
 
 log STEP "XDG 路径契约探测（这一步不判定对错，只输出当前行为）"

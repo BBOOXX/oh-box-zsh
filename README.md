@@ -1,49 +1,50 @@
 # oh-box-zsh
 
-从 0 开始构建的 zsh 配置框架，不依赖 oh-my-zsh。
+一个不依赖 oh-my-zsh 的 zsh 配置框架。
 
-## 现在的使用方式
+## 目标
 
-平时优先只改一个文件：
+- 分离 login / interactive 两个阶段
+- 把基础库、组件、模块拆开
+- 保持跨 macOS / Linux / Termux 可演进
+- 允许后续接入 cache / lazy 机制优化启动
 
-- `zsh/config.zsh`：主配置入口
+## 当前结构
 
-可选覆盖：
-
-- `zsh/config.local.zsh`：本机私有覆盖，不进版本控制
-- `zsh/local.zsh`：最后加载的任意自定义代码入口
-
-内部实现目录默认不需要日常编辑：
-
-- `zsh/conf/`：zsh 行为实现与内部默认值
-- `zsh/modules/`：外部工具模块
+- `zsh/local.zsh`：用户主配置入口，只在 interactive 阶段加载
+- `zsh/local.zsh.example`：用户主配置示例
+- `zsh/components/defaults.zsh`：项目默认配置中心
+- `zsh/components/`：zsh 行为实现组件与模块加载器
+- `zsh/modules/`：可选模块目录
 - `zsh/lib/`：基础能力
-- `zsh/stages/`：启动阶段调度
-
-## 目录结构
+- `zsh/stages/`：阶段调度
+- `zsh/themes/`：主题实现
 
 ```text
-zsh/
-├── config.zsh
-├── config.local.zsh
-├── init.zsh
-├── .zprofile
-├── .zshrc
-├── conf/
-│   ├── defaults.zsh
-│   ├── history.zsh
-│   ├── completion.zsh
-│   ├── keybinds.zsh
-│   ├── prompt.zsh
-│   ├── modules-common.zsh
-│   ├── modules-login.zsh
-│   └── modules-interactive.zsh
-├── modules/
-├── lib/
-├── stages/
-├── themes/
-└── local.zsh
-````
+.
+├── install.sh
+├── test-local-zsh.sh
+├── zshenv
+└── zsh/
+    ├── .zprofile
+    ├── .zshrc
+    ├── init.zsh
+    ├── local.zsh
+    ├── local.zsh.example
+    ├── components/
+    │   ├── defaults.zsh
+    │   ├── history.zsh
+    │   ├── completion.zsh
+    │   ├── keybinds.zsh
+    │   ├── prompt.zsh
+    │   ├── module-loader-common.zsh
+    │   ├── module-loader-login.zsh
+    │   └── module-loader-interactive.zsh
+    ├── modules/
+    ├── lib/
+    ├── stages/
+    └── themes/
+```
 
 ## 启动顺序
 
@@ -52,12 +53,24 @@ zshenv
   -> ZDOTDIR
   -> init.zsh
   -> lib/*
-  -> conf/defaults.zsh
-  -> config.zsh
-  -> config.local.zsh (optional)
+  -> components/defaults.zsh
   -> stages/login.zsh or stages/interactive.zsh
+
+interactive 阶段内部：
   -> local.zsh (optional)
+  -> components/history.zsh
+  -> components/completion.zsh
+  -> components/keybinds.zsh
+  -> components/prompt.zsh
+  -> components/module-loader-interactive.zsh
 ```
+
+关键语义：
+
+- `defaults.zsh` 是项目默认配置
+- `local.zsh` 是用户主配置入口
+- `login` 不读取 `local.zsh`
+- `interactive` 才读取 `local.zsh`
 
 ## 安装
 
@@ -84,6 +97,4 @@ chmod +x ./test-local-zsh.sh
 
 以下文件默认不进版本控制：
 
-* `zsh/config.local.zsh`
-* `zsh/local.zsh`
-
+- `zsh/local.zsh`

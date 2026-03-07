@@ -1,4 +1,4 @@
-# conf/keybinds.zsh
+# components/keybinds.zsh
 # 按键行为入口 编辑模式 + 常用快捷键
 
 # 根据 ZSH_KEYMAP 选择编辑模式

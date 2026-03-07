@@ -1,8 +1,8 @@
-# conf/defaults.zsh
-# 框架内部默认值层
-# - 只负责兜底
-# - 不作为日常编辑入口
-# - 用户配置请写到 config.zsh / config.local.zsh
+# components/defaults.zsh
+# 项目默认配置中心
+# - 这是仓库内提交的默认配置面板
+# - 用户日常修改请写到 local.zsh
+# - 这里只定义项目默认值与兜底值
 
 # ------------------------------
 # 内建 zsh 行为开关

@@ -1,4 +1,4 @@
-# conf/completion.zsh
+# components/completion.zsh
 # 补全系统初始化 把 compdump 放到缓存目录 避免污染配置目录
 
 # 目录预创建 保证 compinit -d 写入路径可用
