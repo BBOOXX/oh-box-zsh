@@ -7,6 +7,7 @@
 - 启动路径短, 默认行为可预期.
 - `login` / `interactive` 明确分阶段.
 - 用户配置入口清晰, 不再把"配置"和"脚本"混在一起.
+- 保留 zsh 原生里高价值的默认交互体验, 但不把外部行为默认全开.
 - 重逻辑只在显式启用时接入, 且优先走 cache / lazy.
 
 ## 设计
@@ -112,6 +113,34 @@ interactive 阶段:
 - `fzf`
 - `tmux`
 
+## 默认迁入的高价值体验
+
+这版默认做了几件事, 目的是保留 zsh 原生里最有用的体验, 但不照搬大型框架的"全开策略".
+
+### completion
+- 大小写不敏感补全.
+- substring 匹配.
+- partial-word 匹配.
+- 自动弹出补全菜单.
+- 在单词中间补全.
+- 补全后光标移到单词末尾.
+- `.` 和 `..` 目录补全.
+- completion cache.
+
+### keybinds
+- `Ctrl-R` 增量历史搜索.
+- 输入前缀后, 上下箭头按前缀搜索历史.
+- `Ctrl-X Ctrl-E` 外部编辑器编辑当前命令行.
+- 常见终端里的 Home / End / Delete / Shift-Tab 兼容绑定.
+
+### history
+- `share_history`
+- `extended_history`
+- `hist_verify`
+- `hist_ignore_dups`
+- `hist_ignore_space`
+- `hist_expire_dups_first`
+
 ## 推荐做法
 
 ### 1. 把"声明"写进 `user/config.zsh`
@@ -137,6 +166,11 @@ ZSH_INTERACTIVE_FEATURES=(
 
 ZSH_THEME="basic-git"
 ZSH_KEYMAP="vi"
+
+# 按需关掉某一项默认增强.
+ZSH_COMPLETION_CASE_INSENSITIVE=0
+ZSH_KEYBINDS_HISTORY_PREFIX_SEARCH=0
+ZSH_HISTORY_SHARE=0
 ```
 
 ### 2. 把"个人脚本"写进 `user/local.zsh`
@@ -184,10 +218,10 @@ chmod +x ./test/test-zsh.sh
 历史记录策略. interactive.
 
 ### completion
-执行 `compinit`, 把 `zcompdump` 放到缓存目录. interactive.
+执行 `compinit`, 把 `zcompdump` 放到缓存目录, 并启用一组可配置的高价值补全增强. interactive.
 
 ### keybinds
-设置 `emacs` / `vi` 编辑模式和 `Ctrl-X Ctrl-E`. interactive.
+设置 `emacs` / `vi` 编辑模式, `Ctrl-X Ctrl-E`, 上下箭头前缀搜历史, Home / End / Delete 等常见按键行为. interactive.
 
 ### prompt
 按主题名加载 `themes/*.zsh`. interactive.
@@ -213,3 +247,4 @@ chmod +x ./test/test-zsh.sh
 - 默认不追求"功能最多", 而追求"结构清楚, 启动可控".
 - `completion` 仍然会带来一定启动开销. 如果你想更极致地压启动时间, 可以把它从 `ZSH_INTERACTIVE_FEATURES` 移除.
 - `pyenv` / `homebrew` / `fzf` 都按"显式启用"处理, 不默认全开.
+- 默认没有迁入"自动标题栏", "大量 alias 注入", "自动更新逻辑"这类更容易引起副作用的行为.

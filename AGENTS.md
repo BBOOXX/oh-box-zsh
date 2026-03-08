@@ -162,7 +162,30 @@ feature 列表顺序有意义.
 
 因此用户如果需要先 homebrew 再 completion, 只要把 homebrew 排在 completion 前面.
 
-## 6. 测试要求
+## 6. 默认 UX 策略
+
+本项目允许迁入 OMZ 风格的高价值默认体验.
+但必须满足下面 4 个条件.
+
+1. 能用 zsh 原生机制实现.
+2. 高频使用, 收益明确.
+3. 副作用和兼容性风险可解释.
+4. 能抽成显式配置项, 可以在 `user/config.zsh` 一键关闭.
+
+默认更鼓励迁入的类别.
+
+- completion matcher 和菜单行为.
+- history 的安全与去重策略.
+- 通用键位和终端兼容绑定.
+
+默认不鼓励直接照搬的类别.
+
+- 大量全局 alias 注入.
+- shell 启动时自动更新.
+- 强依赖外部生态的黑盒探测.
+- 明显影响远程环境, tmux, 终端标题栏的副作用行为.
+
+## 7. 测试要求
 
 优先使用临时 HOME 做集成测试, 不污染真实环境.
 
@@ -185,7 +208,7 @@ HOME="$TMPHOME" XDG_CONFIG_HOME="$TMPHOME/.config" zsh -ic 'echo interactive:$ZD
 - login 能看到 `user/config.zsh`.
 - interactive 能看到 `user/local.zsh`.
 
-## 7. 代码风格
+## 8. 代码风格
 
 - shell 目标是 zsh, 不要求 bash 兼容.
 - 新增函数必须有职责说明.

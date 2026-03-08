@@ -36,16 +36,40 @@
 # ZSH_KEYMAP="emacs"
 # ZSH_KEYMAP="vi"
 
-# 示例 4. homebrew shellenv 缓存时间, 单位秒.
+# 示例 4. completion 体验开关.
+# 把这些值改成 0, 就能逐项关掉默认增强.
+# ZSH_COMPLETION_CASE_INSENSITIVE=1
+# ZSH_COMPLETION_MATCH_SUBSTRING=1
+# ZSH_COMPLETION_MATCH_PARTIAL_WORD=1
+# ZSH_COMPLETION_AUTO_MENU=1
+# ZSH_COMPLETION_MENU_SELECT=1
+# ZSH_COMPLETION_COMPLETE_IN_WORD=1
+# ZSH_COMPLETION_ALWAYS_TO_END=1
+# ZSH_COMPLETION_USE_BASHCOMPINIT=0
+
+# 示例 5. keybinds 体验开关.
+# ZSH_KEYBINDS_HISTORY_PREFIX_SEARCH=1
+# ZSH_KEYBINDS_HOME_END=1
+# ZSH_KEYBINDS_DELETE=1
+# ZSH_KEYBINDS_SHIFT_TAB_REVERSE_MENU=1
+
+# 示例 6. history 体验开关.
+# ZSH_HISTORY_SIZE=50000
+# ZSH_HISTORY_SAVE_SIZE=50000
+# ZSH_HISTORY_SHARE=1
+# ZSH_HISTORY_EXTENDED=1
+# ZSH_HISTORY_VERIFY=1
+
+# 示例 7. homebrew shellenv 缓存时间, 单位秒.
 # ZSH_HOMEBREW_SHELLENV_TTL=86400
 
-# 示例 5. pyenv.
+# 示例 8. pyenv.
 # 默认 lazy 模式会在第一次真正调用相关命令时再执行 pyenv init - zsh.
 # 如果你不想懒加载, 可以改成 0.
 # ZSH_PYENV_LAZY=1
 # ZSH_PYENV_INIT_COMMANDS="pyenv"
 
-# 示例 6. tmux 自动附着.
+# 示例 9. tmux 自动附着.
 # 默认关闭.
 # ZSH_TMUX_AUTO_ATTACH=1
 # ZSH_TMUX_SESSION="main"

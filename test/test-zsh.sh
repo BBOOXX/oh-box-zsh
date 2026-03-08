@@ -298,6 +298,21 @@ EOF
     print_block "zsh -ic" "$INTERACTIVE_OUT"
     assert_contains "$INTERACTIVE_OUT" 'cfg=loaded_from_config' "interactive 阶段能看到 config.zsh"
     assert_contains "$INTERACTIVE_OUT" 'local=loaded_from_local' "interactive 阶段加载 local.zsh"
+
+    # 再做一组默认 UX 验证.
+    # 这里只验证最关键的几个默认行为是否真的被打开.
+    if run_capture UX_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "case=${ZSH_COMPLETION_CASE_INSENSITIVE:-0} opt_complete_in_word=${options[completeinword]:-off} opt_auto_menu=${options[automenu]:-off} opt_share_history=${options[sharehistory]:-off} opt_hist_verify=${options[histverify]:-off}"'
+  then
+    print_block "zsh default ux" "$UX_OUT"
+    assert_contains "$UX_OUT" 'case=1' "默认开启大小写无关补全配置"
+    assert_contains "$UX_OUT" 'opt_complete_in_word=on' "默认开启 complete_in_word"
+    assert_contains "$UX_OUT" 'opt_auto_menu=on' "默认开启 auto_menu"
+    assert_contains "$UX_OUT" 'opt_share_history=on' "默认开启 share_history"
+    assert_contains "$UX_OUT" 'opt_hist_verify=on' "默认开启 hist_verify"
+  else
+    print_block "zsh default ux" "$UX_OUT"
+    fail "默认 UX 验证失败"
+  fi
   else
     print_block "zsh -ic" "$INTERACTIVE_OUT"
     fail "zsh -ic 执行失败"
