@@ -177,8 +177,7 @@ assert_file "$REPO_ROOT/install.sh" "install.sh 存在"
 assert_file "$REPO_ROOT/zshenv" "zshenv 存在"
 assert_dir  "$REPO_ROOT/zsh" "zsh 目录存在"
 assert_file "$REPO_ROOT/zsh/init.zsh" "init.zsh 存在"
-assert_file "$REPO_ROOT/zsh/conf/defaults.zsh" "conf/defaults.zsh 存在"
-assert_file "$REPO_ROOT/zsh/conf/local.zsh.example" "conf/local.zsh.example 存在"
+assert_not_exists "$REPO_ROOT/zsh/conf" "conf 目录已删除"
 assert_file "$REPO_ROOT/zsh/user/config.zsh" "user/config.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/env-path.zsh" "features/env-path.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/pyenv.zsh" "features/pyenv.zsh 存在"
@@ -515,10 +514,10 @@ EOF
     # 再做一组默认 UX 验证.
     # 这里只验证最关键的几个默认行为是否真的被打开.
     # shellcheck disable=SC2016
-    if run_capture UX_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "case=${ZSH_COMPLETION_CASE_INSENSITIVE:-0} opt_complete_in_word=${options[completeinword]:-off} opt_auto_menu=${options[automenu]:-off} opt_share_history=${options[sharehistory]:-off} opt_hist_verify=${options[histverify]:-off}"'
+    if run_capture UX_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'typeset -a matchers; zstyle -a ":completion:*" matcher-list matchers >/dev/null 2>&1; print -r -- "matchers=${(j:|:)matchers} opt_complete_in_word=${options[completeinword]:-off} opt_auto_menu=${options[automenu]:-off} opt_share_history=${options[sharehistory]:-off} opt_hist_verify=${options[histverify]:-off}"'
   then
     print_block "zsh default ux" "$UX_OUT"
-    assert_contains "$UX_OUT" 'case=1' "默认开启大小写无关补全配置"
+    assert_contains "$UX_OUT" 'm:{[:lower:][:upper:]}={[:upper:][:lower:]}' "默认开启大小写无关补全 matcher"
     assert_contains "$UX_OUT" 'opt_complete_in_word=on' "默认开启 complete_in_word"
     assert_contains "$UX_OUT" 'opt_auto_menu=on' "默认开启 auto_menu"
     assert_contains "$UX_OUT" 'opt_share_history=on' "默认开启 share_history"
@@ -530,6 +529,66 @@ EOF
   else
     print_block "zsh -ic" "$INTERACTIVE_OUT"
     fail "zsh -ic 执行失败"
+  fi
+
+  log STEP "stage 默认 feature 兜底验证"
+
+  DEFAULT_REPO="$TMPROOT/default-runtime-repo"
+  cp -R "$REPO_ROOT" "$DEFAULT_REPO"
+
+  cat > "$DEFAULT_REPO/zsh/user/config.zsh" <<'EOF'
+# 这个临时 config 故意不声明 feature 列表.
+typeset -g TEST_DEFAULT_CONFIG_MARK="loaded_without_feature_lists"
+EOF
+
+  cat > "$DEFAULT_REPO/zsh/user/local.zsh" <<'EOF'
+# 这个临时 local 用于验证 interactive 默认仍会加载 local 层.
+typeset -g TEST_DEFAULT_LOCAL_MARK="loaded_from_default_local"
+EOF
+
+  DEFAULT_HOME="$TMPROOT/default-runtime-home"
+  DEFAULT_XDG="$DEFAULT_HOME/.config"
+  mkdir -p "$DEFAULT_HOME/.local/bin" "$DEFAULT_HOME/.local/sbin" "$DEFAULT_HOME/bin"
+
+  if run_capture DEFAULT_INSTALL_OUT env -i     HOME="$DEFAULT_HOME"     XDG_CONFIG_HOME="$DEFAULT_XDG"     PATH="$PATH"     "$BASH_BIN" "$DEFAULT_REPO/install.sh" --link --force
+  then
+    print_block "default runtime install" "$DEFAULT_INSTALL_OUT"
+    pass "default runtime repo 安装成功"
+  else
+    print_block "default runtime install" "$DEFAULT_INSTALL_OUT"
+    fail "default runtime repo 安装失败"
+  fi
+
+  # shellcheck disable=SC2016
+  if run_capture DEFAULT_LOGIN_OUT env -i     HOME="$DEFAULT_HOME"     XDG_CONFIG_HOME="$DEFAULT_XDG"     PATH="$PATH"     "$ZSH_BIN" -lc 'print -r -- "cfg=${TEST_DEFAULT_CONFIG_MARK:-none} login_features=${(j:,:)ZSH_LOGIN_FEATURES} path0=${path[1]:-none} path1=${path[2]:-none} path2=${path[3]:-none}"'
+  then
+    print_block "default zsh -lc" "$DEFAULT_LOGIN_OUT"
+    assert_contains "$DEFAULT_LOGIN_OUT" 'cfg=loaded_without_feature_lists' "最小 config 仍会被加载"
+    assert_contains "$DEFAULT_LOGIN_OUT" 'login_features=env-path' "login 阶段会为缺省 feature 列表兜底"
+    assert_contains "$DEFAULT_LOGIN_OUT" "path0=$DEFAULT_HOME/bin" "默认 login feature 会注入 ~/bin"
+    assert_contains "$DEFAULT_LOGIN_OUT" "path1=$DEFAULT_HOME/.local/sbin" "默认 login feature 会注入 ~/.local/sbin"
+    assert_contains "$DEFAULT_LOGIN_OUT" "path2=$DEFAULT_HOME/.local/bin" "默认 login feature 会继续注入 ~/.local/bin"
+  else
+    print_block "default zsh -lc" "$DEFAULT_LOGIN_OUT"
+    fail "默认 login feature 兜底验证失败"
+  fi
+
+  # shellcheck disable=SC2016
+  if run_capture DEFAULT_INTERACTIVE_OUT env -i     HOME="$DEFAULT_HOME"     XDG_CONFIG_HOME="$DEFAULT_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "cfg=${TEST_DEFAULT_CONFIG_MARK:-none} local=${TEST_DEFAULT_LOCAL_MARK:-none} interactive_features=${(j:,:)ZSH_INTERACTIVE_FEATURES} prompt=$PROMPT keymap=${ZSH_KEYMAP:-unset}"; print -r -- "opt_complete_in_word=${options[completeinword]:-off} opt_auto_menu=${options[automenu]:-off} opt_share_history=${options[sharehistory]:-off} opt_hist_verify=${options[histverify]:-off}"'
+  then
+    print_block "default zsh -ic" "$DEFAULT_INTERACTIVE_OUT"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'cfg=loaded_without_feature_lists' "interactive 阶段也能看到最小 config"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'local=loaded_from_default_local' "interactive 默认仍会加载 local 层"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'interactive_features=history,completion,keybinds,prompt' "interactive 阶段会为缺省 feature 列表兜底"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'prompt=%n@%m %1~ %# ' "缺省主题会回退到 basic"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'keymap=unset' "默认编辑模式由 keybinds 模块内部兜底, 不强制写回配置变量"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'opt_complete_in_word=on' "缺省 interactive feature 会启用 completion"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'opt_auto_menu=on' "缺省 interactive feature 会启用 auto_menu"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'opt_share_history=on' "缺省 interactive feature 会启用 history 共享"
+    assert_contains "$DEFAULT_INTERACTIVE_OUT" 'opt_hist_verify=on' "缺省 interactive feature 会启用 hist_verify"
+  else
+    print_block "default zsh -ic" "$DEFAULT_INTERACTIVE_OUT"
+    fail "默认 interactive feature 兜底验证失败"
   fi
 
   assert_not_exists "$RUNTIME_HOME/.cache/zsh/z/data" "interactive 启动不会预写 z 索引"

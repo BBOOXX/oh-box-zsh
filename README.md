@@ -20,10 +20,6 @@
     ├── .zprofile
     ├── .zshrc
     ├── init.zsh
-    ├── conf/
-    │   ├── defaults.zsh
-    │   ├── config.zsh.example
-    │   └── local.zsh.example
     ├── core/
     │   ├── 00-core.zsh
     │   ├── 10-path.zsh
@@ -53,7 +49,6 @@
   -> zsh/.zprofile or zsh/.zshrc
   -> zsh/init.zsh
   -> zsh/core/*
-  -> zsh/conf/defaults.zsh
   -> zsh/user/config.zsh
   -> zsh/stage/login.zsh 或 zsh/stage/interactive.zsh
 
@@ -61,3 +56,6 @@ interactive 阶段:
   -> ZSH_INTERACTIVE_FEATURES 按顺序加载
   -> zsh/user/local.zsh (if present)
 ```
+
+默认值不再集中在单个 `defaults.zsh`.
+模块参数由各自 `feature` 或 `theme` 用本地 fallback 处理, 阶段 feature 列表由 `stage/*.zsh` 负责兜底.

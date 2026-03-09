@@ -10,6 +10,13 @@
 # - 把 local 放最后, alias, function, bindkey 才最稳定
 typeset -g ZSH_CURRENT_STAGE="interactive"
 
+# interactive feature 列表由 stage 自己兜底
+# 这样默认顺序和阶段职责保持在一起, 不需要集中默认值层
+if (( ! ${+ZSH_INTERACTIVE_FEATURES} )); then
+  typeset -ga ZSH_INTERACTIVE_FEATURES
+  ZSH_INTERACTIVE_FEATURES=(history completion keybinds prompt)
+fi
+
 # 先加载 interactive feature
 zsh_load_feature_list "${ZSH_INTERACTIVE_FEATURES[@]}"
 

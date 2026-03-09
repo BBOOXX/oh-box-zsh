@@ -115,7 +115,6 @@ trap 'rm -rf "$TMPROOT"' EXIT
 
 typeset -g ZDOTDIR="$REPO_ROOT/zsh"
 typeset -g ZSH_ROOT="$ZDOTDIR"
-typeset -g ZSH_CONF_DIR="$ZSH_ROOT/conf"
 typeset -g ZSH_CORE_DIR="$ZSH_ROOT/core"
 typeset -g ZSH_FEATURE_DIR="$ZSH_ROOT/features"
 typeset -g ZSH_STAGE_DIR="$ZSH_ROOT/stage"

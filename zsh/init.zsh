@@ -5,12 +5,10 @@
 # 2. 建立目录变量
 # 3. 加载 core 层
 # 4. 做环境探测
-# 5. 加载项目默认值
-# 6. 加载用户声明式配置
-# 7. 按阶段分发到 login 或 interactive
+# 5. 加载用户声明式配置
+# 6. 按阶段分发到 login 或 interactive
 
 # 目录职责
-# - conf 默认值和示例
 # - core 基础设施
 # - features 功能实现
 # - stage 阶段调度
@@ -27,7 +25,6 @@ fi
 # 建立目录变量
 # 这些变量会被后续 core, feature, stage 层共享使用
 typeset -g ZSH_ROOT="$ZDOTDIR"
-typeset -g ZSH_CONF_DIR="$ZSH_ROOT/conf"
 typeset -g ZSH_CORE_DIR="$ZSH_ROOT/core"
 typeset -g ZSH_FEATURE_DIR="$ZSH_ROOT/features"
 typeset -g ZSH_STAGE_DIR="$ZSH_ROOT/stage"
@@ -66,8 +63,8 @@ if [[ -z "${__zsh_framework_bootstrapped:-}" ]]; then
     zsh_detect_env
   fi
 
-  # 先加载项目默认值, 再加载用户声明式配置
-  zsh_source_required "$ZSH_CONF_DIR/defaults.zsh"
+  # 用户声明式配置在 stage 之前加载
+  # 各模块和阶段自行处理各自的默认值
   zsh_source_optional "$ZSH_USER_DIR/config.zsh"
 
   # 标记 bootstrap 已完成

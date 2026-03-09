@@ -37,23 +37,11 @@
 - 为个人长期使用而设计, 但结构足够干净, 可以持续扩展.
 - 默认偏保守, 按需开启增强能力.
 
-## 3. 四层模型
+## 3. 三层模型
 
-整个仓库严格分成四层.
+整个仓库严格分成三层.
 
-### 3.1 默认层
-文件位置.
-
-- `zsh/conf/defaults.zsh`
-
-职责.
-
-- 只定义项目默认值.
-- 不写业务逻辑.
-- 不调用外部命令.
-- 不写 alias, function, bindkey.
-
-### 3.2 声明层
+### 3.1 声明层
 文件位置.
 
 - `zsh/user/config.zsh`
@@ -64,7 +52,7 @@
 - 只放声明式配置.
 - 例如 feature 列表, 主题名, 编辑模式, 模块参数.
 
-### 3.3 实现层
+### 3.2 实现层
 文件位置.
 
 - `zsh/core/*`
@@ -76,9 +64,10 @@
 - `core` 放基础设施.
 - `features` 放功能实现.
 - `themes` 放 prompt 主题.
+- 默认值跟随消费点实现, 不再集中到单独 defaults 文件.
 - 不把用户主配置重新分散回实现文件.
 
-### 3.4 脚本层
+### 3.3 脚本层
 文件位置.
 
 - `zsh/user/local.zsh`
@@ -100,7 +89,6 @@
     ├── .zprofile
     ├── .zshrc
     ├── init.zsh
-    ├── conf/
     ├── core/
     ├── features/
     ├── stage/
@@ -110,7 +98,6 @@
 
 约束如下.
 
-- `conf/` 只放默认值和示例.
 - `core/` 只放基础设施.
 - `features/` 统一放功能实现.
 - `stage/` 只做阶段调度.
@@ -143,10 +130,9 @@
 2. 建立目录变量.
 3. 加载 `core/*`.
 4. 做环境探测.
-5. 加载 `conf/defaults.zsh`.
-6. 加载 `user/config.zsh`.
-7. 按阶段分发到 `stage/login.zsh` 或 `stage/interactive.zsh`.
-8. 处理 bootstrap guard 和 stage guard.
+5. 加载 `user/config.zsh`.
+6. 按阶段分发到 `stage/login.zsh` 或 `stage/interactive.zsh`.
+7. 处理 bootstrap guard 和 stage guard.
 
 禁止.
 
@@ -159,6 +145,7 @@ feature 列表顺序有意义.
 
 - `ZSH_LOGIN_FEATURES` 的顺序就是 login 阶段执行顺序.
 - `ZSH_INTERACTIVE_FEATURES` 的顺序就是 interactive 阶段执行顺序.
+- 如果用户没有声明这两个数组, 对应 `stage/*.zsh` 自己提供最小可用默认值.
 
 因此用户如果需要先 homebrew 再 completion, 只要把 homebrew 排在 completion 前面.
 
