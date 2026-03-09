@@ -425,6 +425,70 @@ path=("${ORIGINAL_PATH[@]}")
 rehash
 unset ZSH_BREW_SHELLENV_TTL TEST_BREW_ENV TEST_BREW_LOAD_COUNT
 
+log STEP "features/autosuggestions.zsh"
+
+typeset -g TEST_AUTOSUGGESTIONS_ROOT="$TMPROOT/fake-autosuggestions"
+typeset -g TEST_AUTOSUGGESTIONS_FILE="$TEST_AUTOSUGGESTIONS_ROOT/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+mkdir -p "${TEST_AUTOSUGGESTIONS_FILE:h}"
+
+{
+  print -r -- 'typeset -g TEST_AUTOSUGGESTIONS_MARK=loaded_from_autosuggestions'
+} >| "$TEST_AUTOSUGGESTIONS_FILE"
+
+unset TEST_AUTOSUGGESTIONS_MARK ZSH_AUTOSUGGESTIONS_FILE __zsh_feature_autosuggestions_loaded
+source "$REPO_ROOT/zsh/features/autosuggestions.zsh" || exit 1
+
+assert_status 0 "zsh_autosuggestions_candidate_from_brew derives plugin path from brew bin" zsh_autosuggestions_candidate_from_brew "$TEST_BREW_ROOT/bin/brew"
+assert_eq "$REPLY" "$TEST_BREW_ROOT/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "autosuggestions candidate path matches brew prefix"
+
+HAD_ZSH_OS="${+ZSH_OS}"
+OLD_ZSH_OS="${ZSH_OS-}"
+HAD_ZSH_ARCH="${+ZSH_ARCH}"
+OLD_ZSH_ARCH="${ZSH_ARCH-}"
+
+ZSH_OS="macos"
+ZSH_ARCH="arm64"
+assert_status 0 "zsh_autosuggestions_default_file supports macOS Apple Silicon" zsh_autosuggestions_default_file
+assert_eq "$REPLY" "/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Apple Silicon 默认 autosuggestions 路径正确"
+
+ZSH_OS="macos"
+ZSH_ARCH="x86_64"
+assert_status 0 "zsh_autosuggestions_default_file supports macOS Intel" zsh_autosuggestions_default_file
+assert_eq "$REPLY" "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Intel macOS 默认 autosuggestions 路径正确"
+
+ZSH_OS="linux"
+ZSH_ARCH="x86_64"
+assert_status 0 "zsh_autosuggestions_default_file supports Linux" zsh_autosuggestions_default_file
+assert_eq "$REPLY" "/home/linuxbrew/.linuxbrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Linux 默认 autosuggestions 路径正确"
+
+ZSH_OS="unknown"
+ZSH_ARCH="unknown"
+assert_status 1 "zsh_autosuggestions_default_file skips unsupported platform" zsh_autosuggestions_default_file
+
+restore_var ZSH_OS "$HAD_ZSH_OS" "$OLD_ZSH_OS"
+restore_var ZSH_ARCH "$HAD_ZSH_ARCH" "$OLD_ZSH_ARCH"
+
+ZSH_AUTOSUGGESTIONS_FILE="$TEST_AUTOSUGGESTIONS_FILE"
+assert_status 0 "zsh_autosuggestions_find_file accepts override file" zsh_autosuggestions_find_file
+assert_eq "$REPLY" "$TEST_AUTOSUGGESTIONS_FILE" "autosuggestions override file is returned as-is"
+
+unset TEST_AUTOSUGGESTIONS_MARK __zsh_feature_autosuggestions_loaded
+source "$REPO_ROOT/zsh/features/autosuggestions.zsh" || exit 1
+assert_eq "${TEST_AUTOSUGGESTIONS_MARK:-unset}" "loaded_from_autosuggestions" "autosuggestions feature sources override file into current shell"
+
+unset ZSH_AUTOSUGGESTIONS_FILE
+typeset -ga TEST_AUTOSUGGESTIONS_PATH_BEFORE=("${path[@]}")
+mkdir -p "$TEST_AUTOSUGGESTIONS_ROOT/bin"
+print -r -- '#!/bin/sh' >| "$TEST_AUTOSUGGESTIONS_ROOT/bin/brew"
+chmod +x "$TEST_AUTOSUGGESTIONS_ROOT/bin/brew"
+path=("$TEST_AUTOSUGGESTIONS_ROOT/bin" "${TEST_AUTOSUGGESTIONS_PATH_BEFORE[@]}")
+rehash
+assert_status 0 "zsh_autosuggestions_find_file derives file from brew in PATH" zsh_autosuggestions_find_file
+assert_eq "$REPLY" "$TEST_AUTOSUGGESTIONS_FILE" "autosuggestions feature prefers brew prefix in PATH"
+
+path=("${ORIGINAL_PATH[@]}")
+rehash
+
 log STEP "40-lazy.zsh"
 
 __zlazy_loader_by_cmd=()

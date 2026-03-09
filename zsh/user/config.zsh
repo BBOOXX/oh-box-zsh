@@ -32,6 +32,7 @@ ZSH_INTERACTIVE_FEATURES=(
   z
   keybinds
   prompt
+  autosuggestions
 )
 
 # 默认主题
