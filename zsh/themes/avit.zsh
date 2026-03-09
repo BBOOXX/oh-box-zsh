@@ -1,10 +1,5 @@
 # themes/avit.zsh
-# OMZ avit 的本地移植版.
-
-# 迁移原则.
-# 1. 主题文件只负责 prompt, 不顺带改 ls 或 grep 配色.
-# 2. 不依赖 OMZ 的 prompt helper, 在仓库内自包含.
-# 3. 用 precmd 和 zle hook 预计算状态, 避免把多段命令替换散到 PROMPT 字符串里.
+# OMZ avit 的本地移植版
 
 if [[ -n "${__zsh_theme_avit_loaded:-}" ]]; then
   return 0
@@ -21,7 +16,7 @@ typeset -g __zsh_avit_rprompt_segment=''
 # --------------------------------------------------
 # __zsh_avit_build_user_host_segment
 # --------------------------------------------------
-# 仅在 SSH 或显式切换用户时显示用户和主机.
+# 仅在 SSH 或显式切换用户时显示用户和主机
 __zsh_avit_build_user_host_segment() {
   emulate -L zsh
 
@@ -43,7 +38,7 @@ __zsh_avit_build_user_host_segment() {
 # --------------------------------------------------
 # __zsh_avit_build_virtualenv_segment
 # --------------------------------------------------
-# 只在启用开关时显示 Python 环境名.
+# 只在启用开关时显示 Python 环境名
 __zsh_avit_build_virtualenv_segment() {
   emulate -L zsh
 
@@ -89,7 +84,7 @@ __zsh_avit_update_vi_mode_segment() {
 # --------------------------------------------------
 # __zsh_avit_now_seconds
 # --------------------------------------------------
-# 优先读 zsh 自带时间参数, 缺失时再退回外部 date.
+# 优先读 zsh 自带时间参数, 缺失时再退回外部 date
 __zsh_avit_now_seconds() {
   emulate -L zsh
 
@@ -110,13 +105,13 @@ __zsh_avit_now_seconds() {
 # --------------------------------------------------
 # __zsh_avit_build_commit_age_segment
 # --------------------------------------------------
-# 把距离最近一次 commit 的秒数格式化成短字符串.
+# 把距离最近一次 commit 的秒数格式化成短字符串
 __zsh_avit_build_commit_age_segment() {
   emulate -L zsh
 
   local seconds="$1"
   local minutes hours days years
-  local age color
+  local age
 
   (( seconds < 0 )) && seconds=0
 
@@ -135,21 +130,13 @@ __zsh_avit_build_commit_age_segment() {
     age="${minutes}m"
   fi
 
-  if (( minutes < 60 )); then
-    color='green'
-  elif (( hours < 24 )); then
-    color='yellow'
-  else
-    color='red'
-  fi
-
-  REPLY="%F{${color}}${age}%f"
+  REPLY="%f${age}"
 }
 
 # --------------------------------------------------
 # __zsh_avit_normalize_branch_name
 # --------------------------------------------------
-# 把 git status --branch 的原始分支描述收敛成 prompt 可读形式.
+# 把 git status --branch 的原始分支描述收敛成 prompt 可读形式
 __zsh_avit_normalize_branch_name() {
   emulate -L zsh
 
@@ -173,7 +160,7 @@ __zsh_avit_normalize_branch_name() {
 # --------------------------------------------------
 # __zsh_avit_build_git_segments
 # --------------------------------------------------
-# 用一次 git status 生成左侧分支状态和右侧工作区摘要.
+# 用一次 git status 生成左侧分支状态和右侧工作区摘要
 __zsh_avit_build_git_segments() {
   emulate -L zsh
 
