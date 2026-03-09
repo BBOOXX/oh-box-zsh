@@ -604,6 +604,26 @@ assert_false "pyenv virtualenv lazy watcher removes chpwd hook after load" test 
 assert_false "pyenv virtualenv hook is not kept on precmd in chpwd mode" test "${precmd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
 assert_true "pyenv virtualenv hook is moved to chpwd in chpwd mode" test "${chpwd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
 
+unset TEST_PYENV_VIRTUALENV_INIT_MARK TEST_PYENV_VIRTUALENV_HOOK __zsh_feature_pyenv_virtualenv_loaded __zsh_feature_pyenv_bin __zsh_pyenv_virtualenv_lazy_registered
+typeset -gx PYENV_VIRTUALENV_INIT=1
+unfunction _pyenv_virtualenv_hook 2>/dev/null || true
+typeset -ga precmd_functions=()
+typeset -ga chpwd_functions=()
+
+builtin cd -- "$TMPROOT"
+assert_status 0 "zsh_pyenv_enable_virtualenv_lazy ignores inherited env-only marker" zsh_pyenv_enable_virtualenv_lazy "$TEST_PYENV_BIN"
+assert_eq "${TEST_PYENV_VIRTUALENV_INIT_MARK:-unset}" "unset" "env-only marker does not pretend virtualenv init already loaded"
+assert_eq "${__zsh_feature_pyenv_virtualenv_loaded:-unset}" "unset" "env-only marker does not flip loaded guard early"
+assert_false "env-only marker still has no virtualenv hook function" test -n "$(typeset -f _pyenv_virtualenv_hook 2>/dev/null)"
+assert_true "env-only marker still registers chpwd watcher" test "${chpwd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+
+builtin cd -- "$TEST_PYENV_PROJECT_SUBDIR"
+assert_status 0 "env-only marker is repaired after entering matching directory" __zsh_pyenv_virtualenv_maybe_load
+assert_eq "${TEST_PYENV_VIRTUALENV_INIT_MARK:-unset}" "loaded_from_virtualenv_init" "env-only marker still reloads virtualenv init script"
+assert_eq "${TEST_PYENV_VIRTUALENV_HOOK:-unset}" "triggered_from_virtualenv_hook" "env-only marker repair also runs virtualenv hook"
+assert_true "env-only marker repair restores virtualenv hook function" test -n "$(typeset -f _pyenv_virtualenv_hook 2>/dev/null)"
+assert_true "env-only marker repair moves hook back to chpwd" test "${chpwd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
+
 unset TEST_PYENV_VIRTUALENV_INIT_MARK TEST_PYENV_VIRTUALENV_HOOK PYENV_VIRTUALENV_INIT __zsh_feature_pyenv_virtualenv_loaded __zsh_feature_pyenv_bin __zsh_pyenv_virtualenv_lazy_registered
 unfunction _pyenv_virtualenv_hook 2>/dev/null || true
 typeset -ga precmd_functions=()

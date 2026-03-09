@@ -380,6 +380,16 @@ zsh_pyenv_register_virtualenv_hook() {
 }
 
 # --------------------------------------------------
+# zsh_pyenv_has_virtualenv_hook
+# --------------------------------------------------
+# 判断当前 shell 是否真的已经载入 pyenv-virtualenv hook.
+# tmux 这类长生命周期进程可能只继承 PYENV_VIRTUALENV_INIT=1, 但 shell function 不会随环境变量继承.
+zsh_pyenv_has_virtualenv_hook() {
+  [[ "${PYENV_VIRTUALENV_INIT:-0}" == "1" ]] || return 1
+  (( $+functions[_pyenv_virtualenv_hook] ))
+}
+
+# --------------------------------------------------
 # __zsh_pyenv_virtualenv_maybe_load
 # --------------------------------------------------
 # 只在进入带 .python-version 的目录上下文时再加载 virtualenv-init
@@ -436,10 +446,20 @@ zsh_pyenv_enable_virtualenv_lazy() {
 
   (( ${ZSH_PYENV_ENABLE_VIRTUALENV_LAZY:-1} )) || return 0
 
-  if [[ -n "${__zsh_feature_pyenv_virtualenv_loaded:-}" || "${PYENV_VIRTUALENV_INIT:-0}" == "1" ]]; then
+  if [[ -n "${__zsh_feature_pyenv_virtualenv_loaded:-}" ]] && zsh_pyenv_has_virtualenv_hook; then
     typeset -g __zsh_feature_pyenv_virtualenv_loaded=1
     zsh_pyenv_register_virtualenv_hook
     return 0
+  fi
+
+  if zsh_pyenv_has_virtualenv_hook; then
+    typeset -g __zsh_feature_pyenv_virtualenv_loaded=1
+    zsh_pyenv_register_virtualenv_hook
+    return 0
+  fi
+
+  if [[ "${PYENV_VIRTUALENV_INIT:-0}" == "1" ]]; then
+    zsh_log_debug "pyenv: virtualenv lazy detected env-only init marker, waiting to reload hook"
   fi
 
   typeset -g __zsh_feature_pyenv_bin="$pyenv_bin"
