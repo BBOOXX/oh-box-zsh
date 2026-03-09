@@ -45,7 +45,7 @@ bindkey '^X^E' edit-command-line
 bindkey '^R' history-incremental-search-backward
 
 # 上下箭头按当前前缀做历史搜索
-# 例如你先输入 git, 再按上箭头, 会优先找历史里以 git 开头的命令
+# 例如先输入 git, 再按上箭头, 会优先找历史里以 git 开头的命令
 if (( ${ZSH_KEYBINDS_HISTORY_PREFIX_SEARCH:-1} )); then
   autoload -Uz up-line-or-beginning-search
   autoload -Uz down-line-or-beginning-search

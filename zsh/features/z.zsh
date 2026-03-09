@@ -12,9 +12,6 @@ if [[ -n "${__zsh_feature_z_loaded:-}" ]]; then
 fi
 typeset -g __zsh_feature_z_loaded=1
 
-# 这些变量默认不放到 defaults.zsh.
-# 原因是它们更像 feature 自己的实现参数.
-# 如果用户确实要改, 可以直接在 user/config.zsh 里预先声明覆盖.
 typeset -g ZSH_Z_DATA_FILE="${ZSH_Z_DATA_FILE:-$ZSH_CACHE_DIR/z/data}"
 typeset -gi ZSH_Z_MAX_ENTRIES="${ZSH_Z_MAX_ENTRIES:-1000}"
 typeset -gi ZSH_Z_LIST_MAX="${ZSH_Z_LIST_MAX:-20}"
@@ -29,8 +26,8 @@ __zsh_z_times=()
 
 zmodload -F zsh/datetime b:EPOCHSECONDS 2>/dev/null || true
 
-# 返回当前 Unix 时间戳.
-# 优先使用 zsh/datetime, 退化时再用外部 date.
+# 返回当前 Unix 时间戳
+# 优先使用 zsh/datetime, 退化时再用外部 date
 __zsh_z_now() {
   emulate -L zsh
 
@@ -44,8 +41,8 @@ __zsh_z_now() {
   REPLY="$now"
 }
 
-# 校验路径文本是否适合进入索引.
-# 这里只做字符串层面的格式限制, 避免在热路径里频繁做文件系统探测.
+# 校验路径文本是否适合进入索引
+# 这里只做字符串层面的格式限制, 避免在热路径里频繁做文件系统探测
 __zsh_z_is_valid_path_text() {
   emulate -L zsh
 
@@ -58,8 +55,8 @@ __zsh_z_is_valid_path_text() {
   return 0
 }
 
-# 过滤不适合写入索引的路径.
-# 这里显式跳过不存在目录, 相对路径和带换行 / Tab 的路径.
+# 过滤不适合写入索引的路径
+# 这里显式跳过不存在目录, 相对路径和带换行 / Tab 的路径
 __zsh_z_should_track_path() {
   emulate -L zsh
 
@@ -70,8 +67,8 @@ __zsh_z_should_track_path() {
   return 0
 }
 
-# 读取数据文件的 mtime.
-# 优先复用 core 层已有的 stat 逻辑, 这样 feature 自己不用重复分平台分支.
+# 读取数据文件的 mtime
+# 优先复用 core 层已有的 stat 逻辑, 这样 feature 自己不用重复分平台分支
 __zsh_z_file_mtime() {
   emulate -L zsh
 
@@ -99,8 +96,8 @@ __zsh_z_file_mtime() {
   return 1
 }
 
-# 清空内存态索引.
-# 这个动作很轻, 让首次加载和按需重载都能走同一条路径.
+# 清空内存态索引
+# 这个动作很轻, 让首次加载和按需重载都能走同一条路径
 __zsh_z_reset_db() {
   emulate -L zsh
 

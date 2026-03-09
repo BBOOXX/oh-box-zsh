@@ -1,7 +1,5 @@
 # 用户个人脚本层
 
-# 适合放 alias, function, bindkey 和个人临时脚本
-
 export PYTHONBREAKPOINT="pudb.set_trace"
 export COLORTERM="truecolor"
 

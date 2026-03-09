@@ -10,11 +10,7 @@
 # 3. 只处理当前 PATH 或官方默认安装位置里的 brew
 # 4. 如果本机没装 brew, 直接静默跳过
 
-# --------------------------------------------------
-# zsh_brew_default_bin
-# --------------------------------------------------
 # 根据当前平台返回 Homebrew 默认 brew 可执行文件路径
-
 # 输出方式
 # - 成功时把路径写入 REPLY
 # - 不支持的平台返回 1
@@ -40,9 +36,6 @@ zsh_brew_default_bin() {
   zsh_log_debug "brew: default-bin return=0 brew=$REPLY"
 }
 
-# --------------------------------------------------
-# zsh_brew_find_bin
-# --------------------------------------------------
 # 优先从当前 PATH 找 brew
 # 如果还没进 PATH, 再回退到官方默认安装位置
 zsh_brew_find_bin() {
@@ -72,9 +65,6 @@ zsh_brew_find_bin() {
   zsh_log_debug "brew: find-bin return=0 brew=$REPLY"
 }
 
-# --------------------------------------------------
-# zsh_brew_cache_key
-# --------------------------------------------------
 # 用 brew 可执行文件路径作为 cache key 的一部分
 # 这样不同前缀或多套 brew 不会共用同一个缓存
 zsh_brew_cache_key() {
@@ -89,11 +79,7 @@ zsh_brew_cache_key() {
   zsh_log_debug "brew: cache-key return=0 key=$REPLY"
 }
 
-# --------------------------------------------------
-# zsh_brew_print_shellenv
-# --------------------------------------------------
 # 输出 brew shellenv zsh 的结果
-#
 # 这里显式清掉当前 PATH 里的 brew 前缀影响
 # 否则当当前 shell 已经初始化过 brew 时
 # brew shellenv 可能因为幂等短路而输出空内容
@@ -120,9 +106,6 @@ zsh_brew_print_shellenv() {
   return "$rc"
 }
 
-# --------------------------------------------------
-# zsh_brew_load_shellenv
-# --------------------------------------------------
 # 通过缓存执行 brew shellenv 并 source 结果
 zsh_brew_load_shellenv() {
   local brew_bin="$1"
@@ -155,9 +138,6 @@ zsh_brew_load_shellenv() {
   return "$rc"
 }
 
-# --------------------------------------------------
-# zsh_brew_init
-# --------------------------------------------------
 # 如果找到 brew, 就加载它的 shellenv 缓存
 zsh_brew_init() {
   local brew_bin

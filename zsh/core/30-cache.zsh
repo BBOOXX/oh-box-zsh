@@ -9,13 +9,6 @@
 # - 某些工具的 shellenv 输出
 # - 其他会输出 shell 代码 且输出内容在短时间内相对稳定的命令
 
-# 这一层当前只做缓存 shell 片段并 source
-# 先不做更复杂的泛用缓存 例如 JSON / 二进制 / 多级缓存
-
-# --------------------------------------------------
-# 默认 TTL 秒
-# --------------------------------------------------
-
 # ZSH_CACHE_DEFAULT_TTL 用来定义默认缓存有效期 单位是秒
 # 如果调用 zcache_source_cmd 时没有显式传 TTL 就会使用它
 
@@ -28,27 +21,20 @@
 typeset -gi ZSH_CACHE_DEFAULT_TTL="${ZSH_CACHE_DEFAULT_TTL:-86400}"
 typeset -gi ZSH_CACHE_MAX_KEY_LEN="${ZSH_CACHE_MAX_KEY_LEN:-120}"
 
-# --------------------------------------------------
 #  缓存文件目录
-# --------------------------------------------------
-
-# 这里单独定义一个shell 片段缓存目录放在
-#   $ZSH_CACHE_DIR/snippets
+# 这里单独定义一个shell 片段缓存目录放在 $ZSH_CACHE_DIR/snippets
 typeset -g ZSH_CACHE_SNIPPET_DIR="${ZSH_CACHE_SNIPPET_DIR:-$ZSH_CACHE_DIR/snippets}"
 
 # 确保缓存目录存在
 zsh_ensure_dir "$ZSH_CACHE_SNIPPET_DIR"
 
-# 优先启用 zsh 自带的时间戳变量.
-# 这样 cache 新鲜度判断可以少起一个外部 date 进程.
+# 优先启用 zsh 自带的时间戳变量
+# 这样 cache 新鲜度判断可以少起一个外部 date 进程
 zmodload -F zsh/datetime b:EPOCHSECONDS 2>/dev/null || true
 
-# --------------------------------------------------
-# zcache_now
-# --------------------------------------------------
-# 获取当前 Unix 时间戳.
-# 优先使用 zsh/datetime 暴露的 EPOCHSECONDS.
-# 只有模块不可用时才回退到外部 date.
+# 获取当前 Unix 时间戳
+# 优先使用 zsh/datetime 暴露的 EPOCHSECONDS
+# 只有模块不可用时才回退到外部 date
 zcache_now() {
   local now="${EPOCHSECONDS:-}"
 
@@ -60,11 +46,7 @@ zcache_now() {
   REPLY="$now"
 }
 
-# --------------------------------------------------
-# zcache_sanitize_key
-# --------------------------------------------------
 # 把用户传入的 cache_key 规范化为适合做文件名的安全字符串
-
 # cache_key 可能包含空格斜杠冒号等不适合作为文件名的字符
 # 例如
 # - "tool-shellenv"        -> "tool-shellenv"
@@ -100,11 +82,8 @@ zcache_sanitize_key() {
   REPLY="$safe_key"
 }
 
-# --------------------------------------------------
-# zcache_compact_key
-# --------------------------------------------------
 # 对过长的安全 key 做二次压缩.
-# 这样既保留一部分可读前缀, 也避免长绝对路径直接打到文件名上限.
+# 这样既保留一部分可读前缀, 也避免长绝对路径直接打到文件名上限
 zcache_compact_key() {
   local safe_key="$1"
   local max_len="${ZSH_CACHE_MAX_KEY_LEN:-120}"
@@ -130,11 +109,7 @@ zcache_compact_key() {
   REPLY="${prefix}_${digest}_${suffix}"
 }
 
-# --------------------------------------------------
-# zcache_path
-# --------------------------------------------------
 # 根据 cache_key 计算对应的缓存文件路径
-
 # 例如
 # cache_key = "tool-shellenv"
 # 则可能得到
@@ -158,11 +133,7 @@ zcache_path() {
   REPLY="$ZSH_CACHE_SNIPPET_DIR/${safe_key}.zsh"
 }
 
-# --------------------------------------------------
-# zcache_get_mtime
-# --------------------------------------------------
 # 获取某个缓存文件的"最后修改时间Unix 时间戳"
-
 # - 成功 把 mtime 写入 REPLY 返回 0
 # - 失败 返回 1
 
@@ -201,14 +172,9 @@ zcache_get_mtime() {
   return 1
 }
 
-# --------------------------------------------------
-# zcache_is_fresh
-# --------------------------------------------------
 # 判断某个缓存文件是否仍然足够新鲜
-
 # - $1: 文件路径
 # - $2: TTL 秒 可省略 省略时使用默认 TTL
-
 # 返回值
 # - 新鲜 0
 # - 过期 / 不存在 / 无法判断 1
@@ -262,8 +228,8 @@ zcache_is_fresh() {
   fi
   mtime="$REPLY"
 
-  # 获取当前时间戳.
-  # 命中 builtin 路径时可以减少启动阶段的外部进程数.
+  # 获取当前时间戳
+  # 命中 builtin 路径时可以减少启动阶段的外部进程数
   if ! zcache_now; then
     zsh_log_debug "zcache: fresh-check return=1 reason=clock-unavailable file=$file"
     return 1
@@ -289,11 +255,7 @@ zcache_is_fresh() {
   return 1
 }
 
-# --------------------------------------------------
-# zcache_invalidate
-# --------------------------------------------------
 # 主动删除某个 cache_key 对应的缓存文件
-
 # 典型场景
 # - 升级了 brew 希望立刻重建 shellenv 缓存
 # - 修改了某模块的初始化逻辑 想强制刷新
@@ -319,20 +281,13 @@ zcache_invalidate() {
   rm -f "$cache_file"
 }
 
-# --------------------------------------------------
-# zcache_ensure_cmd
-# --------------------------------------------------
 # 确保某个命令输出已经被缓存到文件中
 # 如果缓存不存在或已过期 就重新执行命令并重建缓存
-
 # 它本身不 source 只负责 确保缓存文件存在且可用
-
 # 参数格式
 #   zcache_ensure_cmd <cache_key> [ttl_seconds] -- <command...>
-
 # 示例
 #   zcache_ensure_cmd "brew-shellenv" 86400 -- "$brew_bin" shellenv
-
 # 返回方式
 # - 成功 把缓存文件路径写入 REPLY 返回 0
 # - 失败 返回命令失败码或 2 参数错误
@@ -463,20 +418,13 @@ zcache_ensure_cmd() {
   return 0
 }
 
-# --------------------------------------------------
-# zcache_source_cmd
-# --------------------------------------------------
-# 这是给调用方直接使用的高层入口函数
 
 # - 调用 zcache_ensure_cmd 确保缓存文件存在且可用
 # - 然后 source 那个缓存文件
-
 # 参数格式
 #   zcache_source_cmd <cache_key> [ttl_seconds] -- <command...>
-
 # 典型用途
 #   zcache_source_cmd "brew-shellenv" 86400 -- "$brew_bin" shellenv
-
 # 注意
 # 这里会 source 缓存文件 所以它只应该用于可信命令输出
 # 不要把不可信来源的文本拿来缓存并 source

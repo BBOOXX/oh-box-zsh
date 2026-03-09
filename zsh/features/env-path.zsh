@@ -1,14 +1,12 @@
 # features/env-path.zsh
 # 轻量 PATH 基础层
 
-# 这个 feature 的目标非常克制
+# 这个 feature 的目标
 # 1. 只做安全的 PATH 拼接
 # 2. 不调用重命令
 # 3. 不做复杂自动探测
 # 4. 不承载第三方工具目录
-#
-# 这层通常适合放到 login 阶段
-# 因为 PATH 是最基础的环境准备之一
+
 # 第三方工具如果需要改 PATH, 应该放到独立 feature 中
 # 再通过 ZSH_LOGIN_FEATURES 或 ZSH_INTERACTIVE_FEATURES 显式接入
 

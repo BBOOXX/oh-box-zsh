@@ -2,17 +2,14 @@
 # zsh-autosuggestions 启动器
 
 # 这个 feature 只负责找到并 source 官方脚本.
-# 它不负责安装插件, 也不在每次启动时执行 brew --prefix.
-# 原因是 brew 本身是外部进程, 交互启动热路径里没必要重复付这笔成本.
+# 它不负责安装插件, 也不在每次启动时执行 brew --prefix
+# 原因是 brew 本身是外部进程, 交互启动热路径里没必要重复付这笔成本
 
 if [[ -n "${__zsh_feature_autosuggestions_loaded:-}" ]]; then
   return 0
 fi
 typeset -g __zsh_feature_autosuggestions_loaded=1
 
-# --------------------------------------------------
-# zsh_autosuggestions_candidate_from_brew
-# --------------------------------------------------
 # 根据 brew 可执行文件路径推导插件脚本路径
 zsh_autosuggestions_candidate_from_brew() {
   emulate -L zsh
@@ -28,9 +25,6 @@ zsh_autosuggestions_candidate_from_brew() {
   REPLY="$prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 }
 
-# --------------------------------------------------
-# zsh_autosuggestions_candidate_from_prefix
-# --------------------------------------------------
 # 根据 Homebrew 前缀推导插件脚本路径
 zsh_autosuggestions_candidate_from_prefix() {
   emulate -L zsh
@@ -42,9 +36,6 @@ zsh_autosuggestions_candidate_from_prefix() {
   REPLY="$prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 }
 
-# --------------------------------------------------
-# zsh_autosuggestions_default_file
-# --------------------------------------------------
 # 根据当前平台返回 Homebrew 默认前缀下的插件脚本路径
 zsh_autosuggestions_default_file() {
   emulate -L zsh
@@ -71,9 +62,6 @@ zsh_autosuggestions_default_file() {
   zsh_log_debug "autosuggestions: default-file return=0 file=$REPLY"
 }
 
-# --------------------------------------------------
-# zsh_autosuggestions_find_file
-# --------------------------------------------------
 # 按优先级定位插件脚本
 # 1. 用户显式覆盖的文件路径
 # 2. 已初始化好的 HOMEBREW_PREFIX
