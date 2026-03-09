@@ -1,0 +1,26 @@
+# 用户个人脚本示例.
+#
+# 这个文件对应的是脚本层, 不是配置层.
+# 它只会在 interactive 阶段的最后加载.
+#
+# 适合放这些内容.
+# - alias
+# - function
+# - bindkey
+# - 临时实验代码
+#
+# 不适合放这些内容.
+# - ZSH_LOGIN_FEATURES
+# - ZSH_INTERACTIVE_FEATURES
+# - 主题, 模式, feature 参数
+#
+# 这样分层之后, 启动时序会非常清楚.
+# config 决定应该启用什么.
+# local 决定我个人还想再补什么脚本.
+
+# alias ll='ls -lah'
+# alias gst='git status'
+
+# mkcd() {
+#   mkdir -p -- "$1" && cd -- "$1"
+# }

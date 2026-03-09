@@ -1,0 +1,60 @@
+# 用户声明式配置示例.
+#
+# 这份示例文件的用途是告诉你, 哪些内容应该写到 user/config.zsh.
+# 规则非常明确.
+# 1. 这里应该只放声明式配置.
+# 2. 它会在 login 和 interactive 两个阶段之前加载.
+# 3. 不要把 alias, function, 临时代码放进来.
+#
+# feature 列表的顺序有意义.
+# 数组里谁排前面, 谁就先加载.
+# 所以如果你希望先跑 env-path 再跑 completion, 就把 env-path 放前面.
+
+# 示例 1. login 阶段接入基础环境能力.
+# typeset -ga ZSH_LOGIN_FEATURES
+# ZSH_LOGIN_FEATURES=(
+#   env-path
+#   custom-tool-path
+# )
+
+# 如果以后要接第三方工具, 建议单独写到 zsh/features/custom-tool-path.zsh.
+# 再把它按顺序插入 feature 列表, 不要把第三方 PATH 逻辑塞回 env-path.
+
+# 示例 2. interactive 阶段接入交互能力.
+# typeset -ga ZSH_INTERACTIVE_FEATURES
+# ZSH_INTERACTIVE_FEATURES=(
+#   history
+#   completion
+#   keybinds
+#   prompt
+# )
+
+# 示例 3. 主题与编辑模式.
+# ZSH_THEME="basic"
+# 如果你需要 git 分支提示, 建议在 themes/ 里新增一个自定义主题.
+# ZSH_KEYMAP="emacs"
+# ZSH_KEYMAP="vi"
+
+# 示例 4. completion 体验开关.
+# 把这些值改成 0, 就能逐项关掉默认增强.
+# ZSH_COMPLETION_CASE_INSENSITIVE=1
+# ZSH_COMPLETION_MATCH_SUBSTRING=1
+# ZSH_COMPLETION_MATCH_PARTIAL_WORD=1
+# ZSH_COMPLETION_AUTO_MENU=1
+# ZSH_COMPLETION_MENU_SELECT=1
+# ZSH_COMPLETION_COMPLETE_IN_WORD=1
+# ZSH_COMPLETION_ALWAYS_TO_END=1
+# ZSH_COMPLETION_USE_BASHCOMPINIT=0
+
+# 示例 5. keybinds 体验开关.
+# ZSH_KEYBINDS_HISTORY_PREFIX_SEARCH=1
+# ZSH_KEYBINDS_HOME_END=1
+# ZSH_KEYBINDS_DELETE=1
+# ZSH_KEYBINDS_SHIFT_TAB_REVERSE_MENU=1
+
+# 示例 6. history 体验开关.
+# ZSH_HISTORY_SIZE=50000
+# ZSH_HISTORY_SAVE_SIZE=50000
+# ZSH_HISTORY_SHARE=1
+# ZSH_HISTORY_EXTENDED=1
+# ZSH_HISTORY_VERIFY=1
