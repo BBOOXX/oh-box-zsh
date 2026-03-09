@@ -32,6 +32,7 @@ ZSH_INTERACTIVE_FEATURES=(
   completion
   pyenv
   z
+  tmux
   keybinds
   prompt
   autosuggestions

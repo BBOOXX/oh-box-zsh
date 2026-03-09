@@ -183,6 +183,7 @@ assert_file "$REPO_ROOT/zsh/user/config.zsh" "user/config.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/env-path.zsh" "features/env-path.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/pyenv.zsh" "features/pyenv.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/z.zsh" "features/z.zsh 存在"
+assert_file "$REPO_ROOT/zsh/features/tmux.zsh" "features/tmux.zsh 存在"
 assert_dir  "$REPO_ROOT/zsh/features" "features 目录存在"
 assert_dir  "$REPO_ROOT/test" "test 目录存在"
 assert_file "$REPO_ROOT/test/test-core.zsh" "test/test-core.zsh 存在"
@@ -369,7 +370,7 @@ typeset -g TEST_CONFIG_MARK="loaded_from_config"
 typeset -ga ZSH_LOGIN_FEATURES
 ZSH_LOGIN_FEATURES=(env-path pyenv test-login-probe)
 typeset -ga ZSH_INTERACTIVE_FEATURES
-ZSH_INTERACTIVE_FEATURES=(history completion pyenv z keybinds prompt)
+ZSH_INTERACTIVE_FEATURES=(history completion pyenv z tmux keybinds prompt)
 ZSH_THEME="avit"
 ZSH_KEYMAP="vi"
 EOF
@@ -406,7 +407,11 @@ EOF
   RUNTIME_PYENV_COMPLETION="$TMPROOT/runtime-pyenv-completion.zsh"
   RUNTIME_PYENV_PROJECT="$RUNTIME_HOME/work-python"
   RUNTIME_PYENV_SUBDIR="$RUNTIME_PYENV_PROJECT/app"
+  RUNTIME_TMUX_BIN="$RUNTIME_HOME/.local/bin/tmux"
+  RUNTIME_TMUX_LOG="$TMPROOT/runtime-tmux.log"
+  RUNTIME_TMUX_HAS_SESSION="$TMPROOT/runtime-tmux.has-session"
   mkdir -p "$RUNTIME_PYENV_ROOT/bin" "$RUNTIME_PYENV_ROOT/shims"
+  mkdir -p "$RUNTIME_HOME/.local/bin"
   mkdir -p "$RUNTIME_PYENV_SUBDIR"
   printf '%s\n' '3.11.9/envs/runtime' > "$RUNTIME_PYENV_PROJECT/.python-version"
 
@@ -443,6 +448,17 @@ exit 1
 EOF
   chmod +x "$RUNTIME_PYENV_BIN"
 
+  cat > "$RUNTIME_TMUX_BIN" <<EOF
+#!/bin/sh
+printf '%s\n' "\$*" >> "$RUNTIME_TMUX_LOG"
+if [ "\$1" = "list-sessions" ]; then
+  [ -f "$RUNTIME_TMUX_HAS_SESSION" ] && exit 0
+  exit 1
+fi
+exit 0
+EOF
+  chmod +x "$RUNTIME_TMUX_BIN"
+
   log STEP "stage guard 验证"
 
   # shellcheck disable=SC2016
@@ -475,7 +491,7 @@ EOF
   fi
 
   # shellcheck disable=SC2016
-  if run_capture INTERACTIVE_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "zdotdir=$ZDOTDIR cfg=${TEST_CONFIG_MARK:-none} login=${TEST_LOGIN_PROBE:-none} local=${TEST_LOCAL_MARK:-none} theme=${ZSH_THEME:-none} keymap=${ZSH_KEYMAP:-none} pyenv_root=${PYENV_ROOT:-none} pyenv_shell=${PYENV_SHELL:-none} pyenv_interactive=${TEST_RUNTIME_PYENV_INTERACTIVE:-none} pyenv_completion=${TEST_RUNTIME_PYENV_COMPLETION:-none} pyenv_virtualenv=${TEST_RUNTIME_PYENV_VIRTUALENV:-none} pyenv_virtualenv_init=${PYENV_VIRTUALENV_INIT:-none}"; print -r -- "prompt=$PROMPT"; print -r -- "rprompt=$RPROMPT"; typeset -f __zsh_avit_precmd >/dev/null 2>&1 && print -r -- "avit_func=yes"; typeset -f pyenv >/dev/null 2>&1 && print -r -- "pyenv_func=yes"; typeset -f _pyenv_virtualenv_hook >/dev/null 2>&1 && print -r -- "pyenv_virtualenv_func=yes"; print -r -- "path0=${path[1]:-none}"'
+  if run_capture INTERACTIVE_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "zdotdir=$ZDOTDIR cfg=${TEST_CONFIG_MARK:-none} login=${TEST_LOGIN_PROBE:-none} local=${TEST_LOCAL_MARK:-none} theme=${ZSH_THEME:-none} keymap=${ZSH_KEYMAP:-none} pyenv_root=${PYENV_ROOT:-none} pyenv_shell=${PYENV_SHELL:-none} pyenv_interactive=${TEST_RUNTIME_PYENV_INTERACTIVE:-none} pyenv_completion=${TEST_RUNTIME_PYENV_COMPLETION:-none} pyenv_virtualenv=${TEST_RUNTIME_PYENV_VIRTUALENV:-none} pyenv_virtualenv_init=${PYENV_VIRTUALENV_INIT:-none}"; print -r -- "prompt=$PROMPT"; print -r -- "rprompt=$RPROMPT"; typeset -f __zsh_avit_precmd >/dev/null 2>&1 && print -r -- "avit_func=yes"; typeset -f pyenv >/dev/null 2>&1 && print -r -- "pyenv_func=yes"; typeset -f tmux >/dev/null 2>&1 && print -r -- "tmux_func=yes"; typeset -f _pyenv_virtualenv_hook >/dev/null 2>&1 && print -r -- "pyenv_virtualenv_func=yes"; print -r -- "path0=${path[1]:-none}"'
   then
     print_block "zsh -ic" "$INTERACTIVE_OUT"
     assert_contains "$INTERACTIVE_OUT" "zdotdir=$RUNTIME_XDG/zsh" "interactive 阶段的 ZDOTDIR 正确指向 XDG 配置目录"
@@ -490,6 +506,7 @@ EOF
     assert_contains "$INTERACTIVE_OUT" 'pyenv_virtualenv=none' "interactive 启动时不会立刻加载 pyenv virtualenv init"
     assert_contains "$INTERACTIVE_OUT" 'pyenv_virtualenv_init=none' "interactive 启动时不会立刻导出 PYENV_VIRTUALENV_INIT"
     assert_contains "$INTERACTIVE_OUT" 'pyenv_func=yes' "interactive 阶段会定义 pyenv shell function"
+    assert_contains "$INTERACTIVE_OUT" 'tmux_func=yes' "interactive 阶段会定义 tmux 包装函数"
     assert_contains "$INTERACTIVE_OUT" "path0=$RUNTIME_PYENV_ROOT/shims" "interactive 阶段会把 pyenv shims 放到 PATH 前面"
     assert_contains "$INTERACTIVE_OUT" '__zsh_avit_git_left_segment' "avit 主题会接管左侧 prompt"
     assert_contains "$INTERACTIVE_OUT" '__zsh_avit_rprompt_segment' "avit 主题会接管右侧 prompt"
@@ -516,6 +533,27 @@ EOF
   fi
 
   assert_not_exists "$RUNTIME_HOME/.cache/zsh/z/data" "interactive 启动不会预写 z 索引"
+
+  rm -f "$RUNTIME_TMUX_LOG" "$RUNTIME_TMUX_HAS_SESSION"
+  if run_capture TMUX_NEW_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$RUNTIME_HOME/.local/bin:$PATH"     "$ZSH_BIN" -ic "tmux >/dev/null 2>&1; cat '$RUNTIME_TMUX_LOG'"
+  then
+    print_block "tmux smart entry new" "$TMUX_NEW_OUT"
+    assert_eq "$TMUX_NEW_OUT" "$(printf 'list-sessions\nnew-session')" "无参 tmux 在无 session 时会 new-session"
+  else
+    print_block "tmux smart entry new" "$TMUX_NEW_OUT"
+    fail "tmux 无 session 场景验证失败"
+  fi
+
+  rm -f "$RUNTIME_TMUX_LOG"
+  : > "$RUNTIME_TMUX_HAS_SESSION"
+  if run_capture TMUX_ATTACH_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$RUNTIME_HOME/.local/bin:$PATH"     "$ZSH_BIN" -ic "tmux >/dev/null 2>&1; cat '$RUNTIME_TMUX_LOG'"
+  then
+    print_block "tmux smart entry attach" "$TMUX_ATTACH_OUT"
+    assert_eq "$TMUX_ATTACH_OUT" "$(printf 'list-sessions\nattach-session')" "无参 tmux 在已有 session 时会 attach-session"
+  else
+    print_block "tmux smart entry attach" "$TMUX_ATTACH_OUT"
+    fail "tmux attach 场景验证失败"
+  fi
 
   if run_capture PYENV_VIRTUALENV_LAZY_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "cd '$RUNTIME_PYENV_SUBDIR'; print -r -- \"pyenv_virtualenv=\${TEST_RUNTIME_PYENV_VIRTUALENV:-none} pyenv_virtualenv_init=\${PYENV_VIRTUALENV_INIT:-none} pyenv_virtualenv_hook=\${TEST_RUNTIME_PYENV_VIRTUALENV_HOOK:-none}\"; typeset -f _pyenv_virtualenv_hook >/dev/null 2>&1 && print -r -- \"pyenv_virtualenv_func=yes\"; print -r -- \"hook_precmd=\${precmd_functions[(Ie)_pyenv_virtualenv_hook]:-0} hook_chpwd=\${chpwd_functions[(Ie)_pyenv_virtualenv_hook]:-0}\""
   then

@@ -677,6 +677,82 @@ else
   unset chpwd_functions
 fi
 
+log STEP "features/tmux.zsh"
+
+HAD_ZSH_TMUX_AUTO_ATTACH="${+ZSH_TMUX_AUTO_ATTACH}"
+OLD_ZSH_TMUX_AUTO_ATTACH="${ZSH_TMUX_AUTO_ATTACH-}"
+HAD_TMUX="${+TMUX}"
+OLD_TMUX="${TMUX-}"
+HAD_TMUX_GUARD="${+__zsh_feature_tmux_loaded}"
+OLD_TMUX_GUARD="${__zsh_feature_tmux_loaded-}"
+typeset -ga TEST_TMUX_SAVED_PATH=("${path[@]}")
+typeset -g TEST_TMUX_ROOT="$TMPROOT/fake-tmux"
+typeset -g TEST_TMUX_BIN="$TEST_TMUX_ROOT/bin/tmux"
+typeset -g TEST_TMUX_LOG="$TMPROOT/fake-tmux.log"
+typeset -g TEST_TMUX_HAS_SESSION_FILE="$TMPROOT/fake-tmux.has-session"
+
+mkdir -p "$TEST_TMUX_ROOT/bin"
+
+{
+  print -r -- '#!/bin/sh'
+  print -r -- "printf '%s\n' \"\$*\" >> \"$TEST_TMUX_LOG\""
+  print -r -- 'if [ "$1" = "list-sessions" ]; then'
+  print -r -- "  [ -f \"$TEST_TMUX_HAS_SESSION_FILE\" ] && exit 0"
+  print -r -- '  exit 1'
+  print -r -- 'fi'
+  print -r -- 'exit 0'
+} >| "$TEST_TMUX_BIN"
+chmod +x "$TEST_TMUX_BIN"
+
+path=("$TEST_TMUX_ROOT/bin" "${TEST_TMUX_SAVED_PATH[@]}")
+rehash
+
+typeset -gi ZSH_TMUX_AUTO_ATTACH=1
+unset TMUX __zsh_feature_tmux_loaded
+unfunction tmux 2>/dev/null || true
+source "$REPO_ROOT/zsh/features/tmux.zsh" || exit 1
+
+assert_true "tmux feature defines tmux wrapper function" test -n "$(typeset -f tmux 2>/dev/null)"
+assert_status 0 "zsh_tmux_should_auto_attach is enabled by default" zsh_tmux_should_auto_attach
+
+/bin/rm -f "$TEST_TMUX_LOG" "$TEST_TMUX_HAS_SESSION_FILE"
+assert_status 0 "tmux feature starts new session when server has no session" tmux
+TEST_TMUX_LOG_OUT="$(<"$TEST_TMUX_LOG")"
+assert_eq "$TEST_TMUX_LOG_OUT" $'list-sessions\nnew-session' "tmux feature checks session list before new-session"
+
+: >| "$TEST_TMUX_HAS_SESSION_FILE"
+/bin/rm -f "$TEST_TMUX_LOG"
+assert_status 0 "tmux feature attaches when server already has session" tmux
+TEST_TMUX_LOG_OUT="$(<"$TEST_TMUX_LOG")"
+assert_eq "$TEST_TMUX_LOG_OUT" $'list-sessions\nattach-session' "tmux feature prefers attach-session when session exists"
+
+/bin/rm -f "$TEST_TMUX_LOG"
+assert_status 0 "tmux feature passes explicit subcommands through unchanged" tmux ls
+TEST_TMUX_LOG_OUT="$(<"$TEST_TMUX_LOG")"
+assert_eq "$TEST_TMUX_LOG_OUT" "ls" "tmux feature does not rewrite explicit subcommands"
+
+TMUX="unit-pane"
+assert_status 1 "zsh_tmux_should_auto_attach skips nested tmux shells" zsh_tmux_should_auto_attach
+/bin/rm -f "$TEST_TMUX_LOG"
+assert_status 0 "tmux feature keeps native no-arg behavior inside tmux" tmux
+TEST_TMUX_LOG_OUT="$(<"$TEST_TMUX_LOG")"
+assert_eq "$TEST_TMUX_LOG_OUT" "" "nested tmux shells bypass smart attach/new logic"
+
+unset TMUX
+typeset -gi ZSH_TMUX_AUTO_ATTACH=0
+assert_status 1 "zsh_tmux_should_auto_attach respects disable switch" zsh_tmux_should_auto_attach
+/bin/rm -f "$TEST_TMUX_LOG"
+assert_status 0 "tmux feature can be disabled declaratively" tmux
+TEST_TMUX_LOG_OUT="$(<"$TEST_TMUX_LOG")"
+assert_eq "$TEST_TMUX_LOG_OUT" "" "disabled tmux feature keeps native no-arg behavior"
+
+restore_var ZSH_TMUX_AUTO_ATTACH "$HAD_ZSH_TMUX_AUTO_ATTACH" "$OLD_ZSH_TMUX_AUTO_ATTACH"
+restore_var TMUX "$HAD_TMUX" "$OLD_TMUX"
+restore_var __zsh_feature_tmux_loaded "$HAD_TMUX_GUARD" "$OLD_TMUX_GUARD"
+path=("${TEST_TMUX_SAVED_PATH[@]}")
+rehash
+unfunction tmux 2>/dev/null || true
+
 log STEP "features/autosuggestions.zsh"
 
 typeset -g TEST_AUTOSUGGESTIONS_ROOT="$TMPROOT/fake-autosuggestions"
