@@ -369,6 +369,8 @@ typeset -ga ZSH_LOGIN_FEATURES
 ZSH_LOGIN_FEATURES=(env-path test-login-probe)
 typeset -ga ZSH_INTERACTIVE_FEATURES
 ZSH_INTERACTIVE_FEATURES=(history completion z keybinds prompt)
+ZSH_THEME="avit"
+ZSH_KEYMAP="vi"
 EOF
 
   cat > "$TMPREPO/zsh/user/local.zsh" <<'EOF'
@@ -427,12 +429,17 @@ EOF
   fi
 
   # shellcheck disable=SC2016
-  if run_capture INTERACTIVE_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "zdotdir=$ZDOTDIR cfg=${TEST_CONFIG_MARK:-none} login=${TEST_LOGIN_PROBE:-none} local=${TEST_LOCAL_MARK:-none}"'
+  if run_capture INTERACTIVE_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "zdotdir=$ZDOTDIR cfg=${TEST_CONFIG_MARK:-none} login=${TEST_LOGIN_PROBE:-none} local=${TEST_LOCAL_MARK:-none} theme=${ZSH_THEME:-none} keymap=${ZSH_KEYMAP:-none}"; print -r -- "prompt=$PROMPT"; print -r -- "rprompt=$RPROMPT"; typeset -f __zsh_avit_precmd >/dev/null 2>&1 && print -r -- "avit_func=yes"'
   then
     print_block "zsh -ic" "$INTERACTIVE_OUT"
     assert_contains "$INTERACTIVE_OUT" "zdotdir=$RUNTIME_XDG/zsh" "interactive 阶段的 ZDOTDIR 正确指向 XDG 配置目录"
     assert_contains "$INTERACTIVE_OUT" 'cfg=loaded_from_config' "interactive 阶段能看到 config.zsh"
     assert_contains "$INTERACTIVE_OUT" 'local=loaded_from_local' "interactive 阶段加载 local.zsh"
+    assert_contains "$INTERACTIVE_OUT" 'theme=avit' "interactive 阶段会加载声明的 avit 主题"
+    assert_contains "$INTERACTIVE_OUT" 'keymap=vi' "interactive 阶段会保留声明的 vi 编辑模式"
+    assert_contains "$INTERACTIVE_OUT" '__zsh_avit_git_left_segment' "avit 主题会接管左侧 prompt"
+    assert_contains "$INTERACTIVE_OUT" '__zsh_avit_rprompt_segment' "avit 主题会接管右侧 prompt"
+    assert_contains "$INTERACTIVE_OUT" 'avit_func=yes' "avit 主题的 precmd 钩子函数已加载"
 
     # 再做一组默认 UX 验证.
     # 这里只验证最关键的几个默认行为是否真的被打开.

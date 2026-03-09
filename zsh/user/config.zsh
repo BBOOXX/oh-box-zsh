@@ -36,7 +36,7 @@ ZSH_INTERACTIVE_FEATURES=(
 )
 
 # 默认主题
-ZSH_THEME="basic"
+ZSH_THEME="avit"
 
 # 默认编辑模式
 ZSH_KEYMAP="emacs"
