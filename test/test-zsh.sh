@@ -60,6 +60,17 @@ assert_exists() {
   fi
 }
 
+assert_not_exists() {
+# ^ 判断路径不存在, 包括不是坏掉的符号链接.
+  local path="$1"
+  local msg="$2"
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    fail "$msg (unexpected path: $path)"
+  else
+    pass "$msg"
+  fi
+}
+
 assert_file() {
 # ^ 判断路径是否是普通文件.
   local path="$1"
@@ -443,14 +454,18 @@ EOF
     fail "zsh -ic 执行失败"
   fi
 
+  assert_not_exists "$RUNTIME_HOME/.cache/zsh/z/data" "interactive 启动不会预写 z 索引"
+
   log STEP "z 目录跳转验证"
 
   TRACK_ALPHA="$RUNTIME_HOME/work-alpha"
   TRACK_BETA="$RUNTIME_HOME/work-beta"
   TRACK_DOWN="$RUNTIME_HOME/Downloads"
-  mkdir -p "$TRACK_ALPHA" "$TRACK_BETA" "$TRACK_DOWN"
+  TRACK_GAMMA="$RUNTIME_HOME/work-gamma"
+  mkdir -p "$TRACK_ALPHA" "$TRACK_BETA" "$TRACK_DOWN" "$TRACK_GAMMA"
   TRACK_ALPHA_REAL="$(CDPATH='' cd -- "$TRACK_ALPHA" && pwd)"
   TRACK_DOWN_REAL="$(CDPATH='' cd -- "$TRACK_DOWN" && pwd)"
+  TRACK_GAMMA_REAL="$(CDPATH='' cd -- "$TRACK_GAMMA" && pwd)"
 
   if run_capture Z_TRACK_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "cd '$TRACK_ALPHA'; cd '$TRACK_BETA'; cd '$TRACK_ALPHA'; cd '$TRACK_DOWN'; print -r -- tracked"
   then
@@ -501,6 +516,15 @@ EOF
   else
     print_block "z completion case-insensitive" "$Z_COMPLETE_CASE_OUT"
     fail "z completion 大小写无关验证失败"
+  fi
+
+  if run_capture Z_RELOAD_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "__zsh_z_completion_candidates alpha >/dev/null; sleep 1; printf '%s\t%s\t%s\n' 7 9999999999 '$TRACK_GAMMA_REAL' >> '$RUNTIME_HOME/.cache/zsh/z/data'; __zsh_z_completion_candidates gamma; print -l -- \${reply[@]}"
+  then
+    print_block "z completion reload" "$Z_RELOAD_OUT"
+    assert_contains "$Z_RELOAD_OUT" "$TRACK_GAMMA_REAL" "z completion 会在数据文件变更后按需重载"
+  else
+    print_block "z completion reload" "$Z_RELOAD_OUT"
+    fail "z completion 按需重载验证失败"
   fi
 fi
 

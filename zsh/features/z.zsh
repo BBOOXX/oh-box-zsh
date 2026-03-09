@@ -3,7 +3,7 @@
 
 # 这个 feature 迁入了 OMZ z 插件里最核心的体验.
 # 1. 记录你 cd 过的目录
-# 2. 用频率 + 最近访问时间做排序
+# 2. 用最近访问时间做主排序, 访问次数只做次级打分
 # 3. 提供 z 命令做快速跳转
 # 4. 把状态放到缓存目录, 不污染声明层和脚本层
 
@@ -22,10 +22,11 @@ typeset -gi ZSH_Z_CASE_INSENSITIVE="${ZSH_Z_CASE_INSENSITIVE:-1}"
 
 typeset -gA __zsh_z_scores
 typeset -gA __zsh_z_times
+typeset -g __zsh_z_db_mtime="${__zsh_z_db_mtime:-}"
+typeset -gi __zsh_z_db_loaded="${__zsh_z_db_loaded:-0}"
 __zsh_z_scores=()
 __zsh_z_times=()
 
-zsh_ensure_dir "${ZSH_Z_DATA_FILE:h}"
 zmodload -F zsh/datetime b:EPOCHSECONDS 2>/dev/null || true
 
 # 返回当前 Unix 时间戳.
@@ -43,6 +44,20 @@ __zsh_z_now() {
   REPLY="$now"
 }
 
+# 校验路径文本是否适合进入索引.
+# 这里只做字符串层面的格式限制, 避免在热路径里频繁做文件系统探测.
+__zsh_z_is_valid_path_text() {
+  emulate -L zsh
+
+  local dir="$1"
+
+  [[ -n "$dir" ]] || return 1
+  [[ "$dir" == /* ]] || return 1
+  [[ "$dir" == *$'\n'* ]] && return 1
+  [[ "$dir" == *$'\t'* ]] && return 1
+  return 0
+}
+
 # 过滤不适合写入索引的路径.
 # 这里显式跳过不存在目录, 相对路径和带换行 / Tab 的路径.
 __zsh_z_should_track_path() {
@@ -50,12 +65,47 @@ __zsh_z_should_track_path() {
 
   local dir="$1"
 
-  [[ -n "$dir" ]] || return 1
-  [[ "$dir" == /* ]] || return 1
+  __zsh_z_is_valid_path_text "$dir" || return 1
   [[ -d "$dir" ]] || return 1
-  [[ "$dir" == *$'\n'* ]] && return 1
-  [[ "$dir" == *$'\t'* ]] && return 1
   return 0
+}
+
+# 读取数据文件的 mtime.
+# 优先复用 core 层已有的 stat 逻辑, 这样 feature 自己不用重复分平台分支.
+__zsh_z_file_mtime() {
+  emulate -L zsh
+
+  local file="$1"
+  local mtime
+
+  if (( $+functions[zcache_get_mtime] )); then
+    zcache_get_mtime "$file" && return 0
+  fi
+
+  [[ -r "$file" ]] || return 1
+
+  mtime="$(stat -c %Y "$file" 2>/dev/null)" || mtime=""
+  if [[ "$mtime" == <-> ]]; then
+    REPLY="$mtime"
+    return 0
+  fi
+
+  mtime="$(stat -f %m "$file" 2>/dev/null)" || mtime=""
+  if [[ "$mtime" == <-> ]]; then
+    REPLY="$mtime"
+    return 0
+  fi
+
+  return 1
+}
+
+# 清空内存态索引.
+# 这个动作很轻, 让首次加载和按需重载都能走同一条路径.
+__zsh_z_reset_db() {
+  emulate -L zsh
+
+  __zsh_z_scores=()
+  __zsh_z_times=()
 }
 
 # 从缓存文件读回目录索引.
@@ -78,25 +128,42 @@ __zsh_z_load_db() {
     __zsh_z_scores[$dir]="$visits"
     __zsh_z_times[$dir]="$last_access"
   done < "$file"
+
+  __zsh_z_prune_db
 }
 
-# 从磁盘重新加载目录索引.
-# 这里会先清空内存态, 适合在每次写回前与其他 shell 做一次合并.
-__zsh_z_reload_db() {
+# 确保当前 shell 里的索引已经就绪.
+# 只在第一次使用或数据文件 mtime 变化时才从磁盘重读.
+__zsh_z_ensure_db_loaded() {
   emulate -L zsh
 
-  __zsh_z_scores=()
-  __zsh_z_times=()
-  __zsh_z_load_db
+  local file="$ZSH_Z_DATA_FILE"
+  local mtime=""
+
+  if __zsh_z_file_mtime "$file"; then
+    mtime="$REPLY"
+  fi
+
+  if (( __zsh_z_db_loaded )) && [[ "$mtime" == "${__zsh_z_db_mtime:-}" ]]; then
+    return 0
+  fi
+
+  __zsh_z_reset_db
+  [[ -n "$mtime" ]] && __zsh_z_load_db
+
+  __zsh_z_db_loaded=1
+  __zsh_z_db_mtime="$mtime"
 }
 
 # 把目录索引刷回缓存文件.
-# 数据量被 ZSH_Z_MAX_ENTRIES 限住, 所以直接整文件重写更简单可验证.
+# 只有在真正发生目录访问时才落盘, 避免 shell 启动时白白做一次 I/O.
 __zsh_z_save_db() {
   emulate -L zsh
 
   local file="$ZSH_Z_DATA_FILE"
+  local tmp_file="${file}.tmp.$$"
   local dir
+  local rc
 
   zsh_ensure_dir "${file:h}"
 
@@ -104,60 +171,59 @@ __zsh_z_save_db() {
     for dir in "${(@ok)__zsh_z_scores}"; do
       printf '%s\t%s\t%s\n' "${__zsh_z_scores[$dir]}" "${__zsh_z_times[$dir]:-0}" "$dir"
     done
-  } >| "$file" || return 1
+  } >| "$tmp_file" || {
+    rc=$?
+    rm -f "$tmp_file" 2>/dev/null
+    return "$rc"
+  }
+
+  mv "$tmp_file" "$file" || {
+    rc=$?
+    rm -f "$tmp_file" 2>/dev/null
+    return "$rc"
+  }
+
+  __zsh_z_db_loaded=1
+  if __zsh_z_file_mtime "$file"; then
+    __zsh_z_db_mtime="$REPLY"
+  else
+    __zsh_z_db_mtime=""
+  fi
 }
 
-# 计算目录的跳转权重.
-# 更近的目录会拿到更高乘数, 但访问次数仍然保留长期价值.
-__zsh_z_rank_value() {
+# 生成排序键.
+# 最近访问优先能省掉每次查询都做一次时间桶计算, 查询路径更短.
+# 访问次数只拿来做同时间戳下的次级排序, 保留一点长期价值.
+__zsh_z_rank_key() {
   emulate -L zsh
 
   local visits="$1"
   local last_access="$2"
-  local now="$3"
-  local age
-  local multiplier
 
   [[ "$visits" == <-> ]] || visits=0
   [[ "$last_access" == <-> ]] || last_access=0
-  [[ "$now" == <-> ]] || now=0
 
-  age=$(( now - last_access ))
-  (( age < 0 )) && age=0
-
-  if (( age <= 3600 )); then
-    multiplier=100
-  elif (( age <= 86400 )); then
-    multiplier=60
-  elif (( age <= 604800 )); then
-    multiplier=30
-  elif (( age <= 2592000 )); then
-    multiplier=10
-  else
-    multiplier=1
-  fi
-
-  REPLY=$(( visits * multiplier * 1000000000 + last_access ))
+  REPLY="${(l:10::0:)last_access}"$'\t'"${(l:6::0:)visits}"
 }
 
-# 清理已经不存在的目录, 并把索引规模控制在上限内.
+# 清理非法记录, 并把索引规模控制在上限内.
+# 热路径只做字符串校验, 不在每次 cd 时把整张表重新 stat 一遍.
 __zsh_z_prune_db() {
   emulate -L zsh
 
   local max_entries="${ZSH_Z_MAX_ENTRIES:-1000}"
-  local now
   local dir
+  local visits
   local last_access
-  local rank
   local worst_dir
-  local worst_rank
+  local worst_visits
   local worst_time
 
   [[ "$max_entries" == <-> ]] || max_entries=1000
   (( max_entries > 0 )) || max_entries=1000
 
   for dir in "${(@k)__zsh_z_scores}"; do
-    if ! __zsh_z_should_track_path "$dir"; then
+    if ! __zsh_z_is_valid_path_text "$dir"; then
       unset "__zsh_z_scores[$dir]"
       unset "__zsh_z_times[$dir]"
     fi
@@ -165,36 +231,32 @@ __zsh_z_prune_db() {
 
   (( ${#__zsh_z_scores} <= max_entries )) && return 0
 
-  __zsh_z_now
-  now="$REPLY"
-
   while (( ${#__zsh_z_scores} > max_entries )); do
     worst_dir=""
-    worst_rank=0
+    worst_visits=0
     worst_time=0
 
     for dir in "${(@k)__zsh_z_scores}"; do
+      visits="${__zsh_z_scores[$dir]:-0}"
       last_access="${__zsh_z_times[$dir]:-0}"
-      __zsh_z_rank_value "${__zsh_z_scores[$dir]:-0}" "$last_access" "$now"
-      rank="$REPLY"
 
       if [[ -z "$worst_dir" ]]; then
         worst_dir="$dir"
-        worst_rank="$rank"
+        worst_visits="$visits"
         worst_time="$last_access"
         continue
       fi
 
-      if (( rank < worst_rank )); then
+      if (( last_access < worst_time )); then
         worst_dir="$dir"
-        worst_rank="$rank"
+        worst_visits="$visits"
         worst_time="$last_access"
         continue
       fi
 
-      if (( rank == worst_rank && last_access < worst_time )); then
+      if (( last_access == worst_time && visits < worst_visits )); then
         worst_dir="$dir"
-        worst_time="$last_access"
+        worst_visits="$visits"
       fi
     done
 
@@ -205,6 +267,7 @@ __zsh_z_prune_db() {
 }
 
 # 把一条目录访问事件写进内存索引并持久化.
+# 当前 shell 只在第一次触发时读盘, 后续直接复用内存态更新.
 __zsh_z_touch_dir() {
   emulate -L zsh
 
@@ -214,7 +277,7 @@ __zsh_z_touch_dir() {
 
   __zsh_z_should_track_path "$dir" || return 0
 
-  __zsh_z_reload_db
+  __zsh_z_ensure_db_loaded
   __zsh_z_now
   now="$REPLY"
   visits="${__zsh_z_scores[$dir]:-0}"
@@ -223,7 +286,20 @@ __zsh_z_touch_dir() {
   __zsh_z_times[$dir]="$now"
 
   __zsh_z_prune_db
-  __zsh_z_save_db
+  __zsh_z_save_db || return $?
+}
+
+# 从内存态里移除一条坏记录并尝试落盘.
+# 这里只在真正要跳转时发现目标目录已失效才触发, 避免把 stat 放到查询热路径里.
+__zsh_z_drop_path() {
+  emulate -L zsh
+
+  local dir="$1"
+
+  [[ -n "$dir" ]] || return 0
+  unset "__zsh_z_scores[$dir]"
+  unset "__zsh_z_times[$dir]"
+  __zsh_z_save_db >/dev/null 2>&1 || true
 }
 
 # chpwd hook 入口.
@@ -262,7 +338,7 @@ __zsh_z_path_matches() {
   return 0
 }
 
-# 收集匹配目录并按权重排序.
+# 收集匹配目录并按排序键排序.
 # 结果通过 reply 数组返回.
 __zsh_z_collect_matches() {
   emulate -L zsh
@@ -272,25 +348,20 @@ __zsh_z_collect_matches() {
   local dir
   local visits
   local last_access
-  local rank
-  local now
 
   queries=("$@")
   records=()
 
-  __zsh_z_now
-  now="$REPLY"
+  __zsh_z_ensure_db_loaded
 
   for dir in "${(@k)__zsh_z_scores}"; do
-    __zsh_z_should_track_path "$dir" || continue
     __zsh_z_path_matches "$dir" "${queries[@]}" || continue
 
     visits="${__zsh_z_scores[$dir]:-0}"
     last_access="${__zsh_z_times[$dir]:-0}"
-    __zsh_z_rank_value "$visits" "$last_access" "$now"
-    rank="$REPLY"
+    __zsh_z_rank_key "$visits" "$last_access"
 
-    records+=("$(printf '%018d\t%010d\t%06d\t%s' "$rank" "$last_access" "$visits" "$dir")")
+    records+=("${REPLY}"$'\t'"$dir")
   done
 
   records=("${(@O)records}")
@@ -298,7 +369,7 @@ __zsh_z_collect_matches() {
 }
 
 # 为 zsh completion 产出目录候选.
-# 这里返回完整路径, 这样选中后 z 仍然可以走"直接 cd 到目录"的路径.
+# 候选直接取完整路径, 这样补全后 z 仍然能走直接 cd 的快路径.
 __zsh_z_completion_candidates() {
   emulate -L zsh
 
@@ -312,12 +383,11 @@ __zsh_z_completion_candidates() {
   queries=("$@")
   candidates=()
 
-  __zsh_z_reload_db
   __zsh_z_collect_matches "${queries[@]}"
   records=("${reply[@]}")
 
   for record in "${records[@]}"; do
-    IFS=$'\t' read -r _ _ _ dir <<< "$record"
+    IFS=$'\t' read -r _ _ dir <<< "$record"
     [[ -n "$dir" ]] || continue
     candidates+=("$dir")
   done
@@ -334,7 +404,6 @@ __zsh_z_print_matches() {
   local limit="${ZSH_Z_LIST_MAX:-20}"
   local shown=0
   local record
-  local rank
   local last_access
   local visits
   local dir
@@ -350,7 +419,7 @@ __zsh_z_print_matches() {
 
   for record in "${records[@]}"; do
     (( shown >= limit )) && break
-    IFS=$'\t' read -r rank last_access visits dir <<< "$record"
+    IFS=$'\t' read -r last_access visits dir <<< "$record"
     printf '%6d  %s\n' "$(( 10#$visits ))" "$dir"
     (( shown += 1 ))
   done
@@ -467,17 +536,23 @@ z() {
     return 1
   fi
 
-  IFS=$'\t' read -r _ _ _ target <<< "${records[1]}"
+  for record in "${records[@]}"; do
+    IFS=$'\t' read -r _ _ target <<< "$record"
+    [[ -n "$target" ]] || continue
 
-  [[ -n "$target" ]] || return 1
-  [[ "$target" == "$PWD" ]] && return 0
+    if ! __zsh_z_should_track_path "$target"; then
+      __zsh_z_drop_path "$target"
+      continue
+    fi
 
-  builtin cd -- "$target"
+    [[ "$target" == "$PWD" ]] && return 0
+    builtin cd -- "$target"
+    return $?
+  done
+
+  zsh_warn "z: no usable match for: ${(j: :)queries}"
+  return 1
 }
-
-__zsh_z_reload_db
-__zsh_z_prune_db
-__zsh_z_save_db
 
 autoload -Uz add-zsh-hook
 add-zsh-hook chpwd __zsh_z_record_pwd
