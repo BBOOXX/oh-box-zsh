@@ -170,6 +170,7 @@ assert_file "$REPO_ROOT/zsh/conf/defaults.zsh" "conf/defaults.zsh 存在"
 assert_file "$REPO_ROOT/zsh/conf/local.zsh.example" "conf/local.zsh.example 存在"
 assert_file "$REPO_ROOT/zsh/user/config.zsh" "user/config.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/env-path.zsh" "features/env-path.zsh 存在"
+assert_file "$REPO_ROOT/zsh/features/z.zsh" "features/z.zsh 存在"
 assert_dir  "$REPO_ROOT/zsh/features" "features 目录存在"
 assert_dir  "$REPO_ROOT/test" "test 目录存在"
 assert_file "$REPO_ROOT/test/test-core.zsh" "test/test-core.zsh 存在"
@@ -356,7 +357,7 @@ typeset -g TEST_CONFIG_MARK="loaded_from_config"
 typeset -ga ZSH_LOGIN_FEATURES
 ZSH_LOGIN_FEATURES=(env-path test-login-probe)
 typeset -ga ZSH_INTERACTIVE_FEATURES
-ZSH_INTERACTIVE_FEATURES=(history completion keybinds prompt)
+ZSH_INTERACTIVE_FEATURES=(history completion z keybinds prompt)
 EOF
 
   cat > "$TMPREPO/zsh/user/local.zsh" <<'EOF'
@@ -440,6 +441,66 @@ EOF
   else
     print_block "zsh -ic" "$INTERACTIVE_OUT"
     fail "zsh -ic 执行失败"
+  fi
+
+  log STEP "z 目录跳转验证"
+
+  TRACK_ALPHA="$RUNTIME_HOME/work-alpha"
+  TRACK_BETA="$RUNTIME_HOME/work-beta"
+  TRACK_DOWN="$RUNTIME_HOME/Downloads"
+  mkdir -p "$TRACK_ALPHA" "$TRACK_BETA" "$TRACK_DOWN"
+  TRACK_ALPHA_REAL="$(CDPATH='' cd -- "$TRACK_ALPHA" && pwd)"
+  TRACK_DOWN_REAL="$(CDPATH='' cd -- "$TRACK_DOWN" && pwd)"
+
+  if run_capture Z_TRACK_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "cd '$TRACK_ALPHA'; cd '$TRACK_BETA'; cd '$TRACK_ALPHA'; cd '$TRACK_DOWN'; print -r -- tracked"
+  then
+    print_block "z track" "$Z_TRACK_OUT"
+    pass "z 目录轨迹建立成功"
+  else
+    print_block "z track" "$Z_TRACK_OUT"
+    fail "z 目录轨迹建立失败"
+  fi
+
+  assert_file "$RUNTIME_HOME/.cache/zsh/z/data" "z feature 会把目录索引写入缓存"
+
+  if run_capture Z_LIST_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "z -l alpha"
+  then
+    print_block "z list" "$Z_LIST_OUT"
+    assert_contains "$Z_LIST_OUT" "$TRACK_ALPHA_REAL" "z -l 会列出命中的目录"
+    assert_not_contains "$Z_LIST_OUT" $'\t' "z -l 不泄漏内部 record 字段"
+  else
+    print_block "z list" "$Z_LIST_OUT"
+    fail "z -l 执行失败"
+  fi
+
+  if run_capture Z_JUMP_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "cd '$RUNTIME_HOME'; z alpha && print -r -- \$PWD"
+  then
+    print_block "z jump" "$Z_JUMP_OUT"
+    assert_contains "$Z_JUMP_OUT" "$TRACK_ALPHA_REAL" "z 能跳到访问过的路径"
+  else
+    print_block "z jump" "$Z_JUMP_OUT"
+    fail "z 跳转执行失败"
+  fi
+
+  if run_capture Z_COMPLETE_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "print -r -- comp=\${_comps[z]:-none}; __zsh_z_completion_candidates alpha; print -l -- \${reply[@]}"
+  then
+    print_block "z completion" "$Z_COMPLETE_OUT"
+    assert_contains "$Z_COMPLETE_OUT" 'comp=_z' "z completion 已注册到 compdef"
+    assert_contains "$Z_COMPLETE_OUT" "$TRACK_ALPHA_REAL" "z completion 能产出目录候选"
+    assert_not_contains "$Z_COMPLETE_OUT" $'\t' "z completion 不泄漏内部 record 字段"
+    assert_not_contains "$Z_COMPLETE_OUT" 'visits' "z completion 不展示内部计数字段"
+  else
+    print_block "z completion" "$Z_COMPLETE_OUT"
+    fail "z completion 验证失败"
+  fi
+
+  if run_capture Z_COMPLETE_CASE_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "__zsh_z_completion_candidates down; print -l -- \${reply[@]}"
+  then
+    print_block "z completion case-insensitive" "$Z_COMPLETE_CASE_OUT"
+    assert_contains "$Z_COMPLETE_CASE_OUT" "$TRACK_DOWN_REAL" "z completion 支持大小写无关的子串匹配"
+  else
+    print_block "z completion case-insensitive" "$Z_COMPLETE_CASE_OUT"
+    fail "z completion 大小写无关验证失败"
   fi
 fi
 

@@ -29,6 +29,7 @@ typeset -ga ZSH_INTERACTIVE_FEATURES
 ZSH_INTERACTIVE_FEATURES=(
   history
   completion
+  z
   keybinds
   prompt
 )
