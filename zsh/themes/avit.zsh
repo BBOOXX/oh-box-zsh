@@ -13,6 +13,12 @@ typeset -g __zsh_avit_vi_mode_segment=''
 typeset -g __zsh_avit_git_left_segment=''
 typeset -g __zsh_avit_rprompt_segment=''
 
+if (( ${ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT:-1} )); then
+  export VIRTUAL_ENV_DISABLE_PROMPT=1
+  export PYENV_VIRTUALENV_DISABLE_PROMPT=1
+  export CONDA_CHANGEPS1=no
+fi
+
 # --------------------------------------------------
 # __zsh_avit_build_user_host_segment
 # --------------------------------------------------
@@ -36,6 +42,55 @@ __zsh_avit_build_user_host_segment() {
 }
 
 # --------------------------------------------------
+# __zsh_avit_normalize_python_env_name
+# --------------------------------------------------
+# 把外部工具给出的环境名收敛成纯文本, 避免把它们自己的 prompt 包装继续带进主题.
+__zsh_avit_normalize_python_env_name() {
+  emulate -L zsh
+  setopt extended_glob
+
+  local name="$1"
+
+  name="${name//$'\r'/ }"
+  name="${name//$'\n'/ }"
+  name="${name##[[:space:]]#}"
+  name="${name%%[[:space:]]#}"
+
+  if [[ "${name}" == '('*')' ]]; then
+    name="${name#\(}"
+    name="${name%\)}"
+    name="${name##[[:space:]]#}"
+    name="${name%%[[:space:]]#}"
+  fi
+
+  REPLY="${name//\%/%%}"
+}
+
+# --------------------------------------------------
+# __zsh_avit_detect_python_env_name
+# --------------------------------------------------
+# 优先用工具声明的展示名, pipenv 再回退到项目目录名, 最后才退回虚拟环境目录名.
+__zsh_avit_detect_python_env_name() {
+  emulate -L zsh
+
+  local name=''
+
+  if [[ -n "${VIRTUAL_ENV_PROMPT:-}" ]]; then
+    name="${VIRTUAL_ENV_PROMPT}"
+  elif [[ -n "${PIPENV_PROMPT:-}" ]]; then
+    name="${PIPENV_PROMPT}"
+  elif [[ -n "${PIPENV_ACTIVE:-}" && -n "${PIPENV_PIPFILE:-}" ]]; then
+    name="${PIPENV_PIPFILE:h:t}"
+  elif [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    name="${VIRTUAL_ENV:t}"
+  elif [[ -n "${CONDA_DEFAULT_ENV:-}" ]]; then
+    name="${CONDA_DEFAULT_ENV}"
+  fi
+
+  __zsh_avit_normalize_python_env_name "$name"
+}
+
+# --------------------------------------------------
 # __zsh_avit_build_virtualenv_segment
 # --------------------------------------------------
 # 只在启用开关时显示 Python 环境名
@@ -49,11 +104,8 @@ __zsh_avit_build_virtualenv_segment() {
     return 0
   fi
 
-  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
-    name="${VIRTUAL_ENV:t}"
-  elif [[ -n "${CONDA_DEFAULT_ENV:-}" ]]; then
-    name="${CONDA_DEFAULT_ENV}"
-  fi
+  __zsh_avit_detect_python_env_name
+  name="$REPLY"
 
   if [[ -n "$name" ]]; then
     REPLY="%F{magenta}(${name})%f "

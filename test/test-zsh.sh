@@ -181,6 +181,7 @@ assert_file "$REPO_ROOT/zsh/conf/defaults.zsh" "conf/defaults.zsh 存在"
 assert_file "$REPO_ROOT/zsh/conf/local.zsh.example" "conf/local.zsh.example 存在"
 assert_file "$REPO_ROOT/zsh/user/config.zsh" "user/config.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/env-path.zsh" "features/env-path.zsh 存在"
+assert_file "$REPO_ROOT/zsh/features/pyenv.zsh" "features/pyenv.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/z.zsh" "features/z.zsh 存在"
 assert_dir  "$REPO_ROOT/zsh/features" "features 目录存在"
 assert_dir  "$REPO_ROOT/test" "test 目录存在"
@@ -366,9 +367,9 @@ else
 # 2. interactive 也能看到 config.
 typeset -g TEST_CONFIG_MARK="loaded_from_config"
 typeset -ga ZSH_LOGIN_FEATURES
-ZSH_LOGIN_FEATURES=(env-path test-login-probe)
+ZSH_LOGIN_FEATURES=(env-path pyenv test-login-probe)
 typeset -ga ZSH_INTERACTIVE_FEATURES
-ZSH_INTERACTIVE_FEATURES=(history completion z keybinds prompt)
+ZSH_INTERACTIVE_FEATURES=(history completion pyenv z keybinds prompt)
 ZSH_THEME="avit"
 ZSH_KEYMAP="vi"
 EOF
@@ -400,6 +401,48 @@ EOF
     fail "runtime repo 安装失败"
   fi
 
+  RUNTIME_PYENV_ROOT="$RUNTIME_HOME/.pyenv"
+  RUNTIME_PYENV_BIN="$RUNTIME_PYENV_ROOT/bin/pyenv"
+  RUNTIME_PYENV_COMPLETION="$TMPROOT/runtime-pyenv-completion.zsh"
+  RUNTIME_PYENV_PROJECT="$RUNTIME_HOME/work-python"
+  RUNTIME_PYENV_SUBDIR="$RUNTIME_PYENV_PROJECT/app"
+  mkdir -p "$RUNTIME_PYENV_ROOT/bin" "$RUNTIME_PYENV_ROOT/shims"
+  mkdir -p "$RUNTIME_PYENV_SUBDIR"
+  printf '%s\n' '3.11.9/envs/runtime' > "$RUNTIME_PYENV_PROJECT/.python-version"
+
+  cat > "$RUNTIME_PYENV_COMPLETION" <<EOF
+typeset -g TEST_RUNTIME_PYENV_COMPLETION=loaded_from_runtime_completion
+EOF
+
+  cat > "$RUNTIME_PYENV_BIN" <<EOF
+#!/bin/sh
+case "\$*" in
+  'init --path --no-push-path --no-rehash')
+    printf '%s\n' 'typeset -gx TEST_RUNTIME_PYENV_LOGIN=loaded_from_runtime_login'
+    printf '%s\n' 'if [[ ":\$PATH:" != *":$RUNTIME_PYENV_ROOT/shims:"* ]]; then export PATH="$RUNTIME_PYENV_ROOT/shims:\${PATH}"; fi'
+    exit 0
+    ;;
+  'init - --no-push-path --no-rehash zsh')
+    printf '%s\n' 'typeset -gx TEST_RUNTIME_PYENV_INTERACTIVE=loaded_from_runtime_interactive'
+    printf '%s\n' 'if [[ ":\$PATH:" != *":$RUNTIME_PYENV_ROOT/shims:"* ]]; then export PATH="$RUNTIME_PYENV_ROOT/shims:\${PATH}"; fi'
+    printf '%s\n' 'export PYENV_SHELL=zsh'
+    printf '%s\n' 'pyenv() { command "$RUNTIME_PYENV_BIN" "\$@"; }'
+    printf '%s\n' "source '$RUNTIME_PYENV_COMPLETION'"
+    exit 0
+    ;;
+  'virtualenv-init -')
+    printf '%s\n' 'typeset -gx TEST_RUNTIME_PYENV_VIRTUALENV=loaded_from_runtime_virtualenv'
+    printf '%s\n' 'export PYENV_VIRTUALENV_INIT=1'
+    printf '%s\n' '_pyenv_virtualenv_hook() { typeset -gx TEST_RUNTIME_PYENV_VIRTUALENV_HOOK=triggered_from_runtime_virtualenv; return 0; }'
+    printf '%s\n' 'typeset -g -a precmd_functions'
+    printf '%s\n' 'if [[ -z \${precmd_functions[(r)_pyenv_virtualenv_hook]:-} ]]; then precmd_functions=(_pyenv_virtualenv_hook \$precmd_functions); fi'
+    exit 0
+    ;;
+esac
+exit 1
+EOF
+  chmod +x "$RUNTIME_PYENV_BIN"
+
   log STEP "stage guard 验证"
 
   # shellcheck disable=SC2016
@@ -416,20 +459,23 @@ EOF
   assert_contains "$INVALID_STAGE_OUT" '[zsh-init] unknown stage: bad' "非法阶段会输出明确错误"
 
   # shellcheck disable=SC2016
-  if run_capture LOGIN_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -lc 'print -r -- "zdotdir=$ZDOTDIR cfg=${TEST_CONFIG_MARK:-none} login=${TEST_LOGIN_PROBE:-none} local=${TEST_LOCAL_MARK:-none}"'
+  if run_capture LOGIN_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -lc 'print -r -- "zdotdir=$ZDOTDIR cfg=${TEST_CONFIG_MARK:-none} login=${TEST_LOGIN_PROBE:-none} local=${TEST_LOCAL_MARK:-none} pyenv_root=${PYENV_ROOT:-none} pyenv_login=${TEST_RUNTIME_PYENV_LOGIN:-none}"; print -r -- "path0=${path[1]:-none}"'
   then
     print_block "zsh -lc" "$LOGIN_OUT"
     assert_contains "$LOGIN_OUT" "zdotdir=$RUNTIME_XDG/zsh" "login 阶段的 ZDOTDIR 正确指向 XDG 配置目录"
     assert_contains "$LOGIN_OUT" 'cfg=loaded_from_config' "login 阶段能看到 config.zsh"
     assert_contains "$LOGIN_OUT" 'login=config_visible_before_login' "login feature 能看到更早加载的 config.zsh"
     assert_contains "$LOGIN_OUT" 'local=none' "login 阶段不加载 local.zsh"
+    assert_contains "$LOGIN_OUT" "pyenv_root=$RUNTIME_PYENV_ROOT" "login 阶段会导出 PYENV_ROOT"
+    assert_contains "$LOGIN_OUT" 'pyenv_login=loaded_from_runtime_login' "login 阶段会加载 pyenv path 初始化"
+    assert_contains "$LOGIN_OUT" "path0=$RUNTIME_PYENV_ROOT/shims" "login 阶段会把 pyenv shims 放到 PATH 前面"
   else
     print_block "zsh -lc" "$LOGIN_OUT"
     fail "zsh -lc 执行失败"
   fi
 
   # shellcheck disable=SC2016
-  if run_capture INTERACTIVE_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "zdotdir=$ZDOTDIR cfg=${TEST_CONFIG_MARK:-none} login=${TEST_LOGIN_PROBE:-none} local=${TEST_LOCAL_MARK:-none} theme=${ZSH_THEME:-none} keymap=${ZSH_KEYMAP:-none}"; print -r -- "prompt=$PROMPT"; print -r -- "rprompt=$RPROMPT"; typeset -f __zsh_avit_precmd >/dev/null 2>&1 && print -r -- "avit_func=yes"'
+  if run_capture INTERACTIVE_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "zdotdir=$ZDOTDIR cfg=${TEST_CONFIG_MARK:-none} login=${TEST_LOGIN_PROBE:-none} local=${TEST_LOCAL_MARK:-none} theme=${ZSH_THEME:-none} keymap=${ZSH_KEYMAP:-none} pyenv_root=${PYENV_ROOT:-none} pyenv_shell=${PYENV_SHELL:-none} pyenv_interactive=${TEST_RUNTIME_PYENV_INTERACTIVE:-none} pyenv_completion=${TEST_RUNTIME_PYENV_COMPLETION:-none} pyenv_virtualenv=${TEST_RUNTIME_PYENV_VIRTUALENV:-none} pyenv_virtualenv_init=${PYENV_VIRTUALENV_INIT:-none}"; print -r -- "prompt=$PROMPT"; print -r -- "rprompt=$RPROMPT"; typeset -f __zsh_avit_precmd >/dev/null 2>&1 && print -r -- "avit_func=yes"; typeset -f pyenv >/dev/null 2>&1 && print -r -- "pyenv_func=yes"; typeset -f _pyenv_virtualenv_hook >/dev/null 2>&1 && print -r -- "pyenv_virtualenv_func=yes"; print -r -- "path0=${path[1]:-none}"'
   then
     print_block "zsh -ic" "$INTERACTIVE_OUT"
     assert_contains "$INTERACTIVE_OUT" "zdotdir=$RUNTIME_XDG/zsh" "interactive 阶段的 ZDOTDIR 正确指向 XDG 配置目录"
@@ -437,6 +483,14 @@ EOF
     assert_contains "$INTERACTIVE_OUT" 'local=loaded_from_local' "interactive 阶段加载 local.zsh"
     assert_contains "$INTERACTIVE_OUT" 'theme=avit' "interactive 阶段会加载声明的 avit 主题"
     assert_contains "$INTERACTIVE_OUT" 'keymap=vi' "interactive 阶段会保留声明的 vi 编辑模式"
+    assert_contains "$INTERACTIVE_OUT" "pyenv_root=$RUNTIME_PYENV_ROOT" "interactive 阶段也会导出 PYENV_ROOT"
+    assert_contains "$INTERACTIVE_OUT" 'pyenv_shell=zsh' "interactive 阶段会导出 PYENV_SHELL"
+    assert_contains "$INTERACTIVE_OUT" 'pyenv_interactive=loaded_from_runtime_interactive' "interactive 阶段会加载 pyenv shell 初始化"
+    assert_contains "$INTERACTIVE_OUT" 'pyenv_completion=loaded_from_runtime_completion' "interactive 阶段会 source pyenv completion"
+    assert_contains "$INTERACTIVE_OUT" 'pyenv_virtualenv=none' "interactive 启动时不会立刻加载 pyenv virtualenv init"
+    assert_contains "$INTERACTIVE_OUT" 'pyenv_virtualenv_init=none' "interactive 启动时不会立刻导出 PYENV_VIRTUALENV_INIT"
+    assert_contains "$INTERACTIVE_OUT" 'pyenv_func=yes' "interactive 阶段会定义 pyenv shell function"
+    assert_contains "$INTERACTIVE_OUT" "path0=$RUNTIME_PYENV_ROOT/shims" "interactive 阶段会把 pyenv shims 放到 PATH 前面"
     assert_contains "$INTERACTIVE_OUT" '__zsh_avit_git_left_segment' "avit 主题会接管左侧 prompt"
     assert_contains "$INTERACTIVE_OUT" '__zsh_avit_rprompt_segment' "avit 主题会接管右侧 prompt"
     assert_contains "$INTERACTIVE_OUT" 'avit_func=yes' "avit 主题的 precmd 钩子函数已加载"
@@ -462,6 +516,18 @@ EOF
   fi
 
   assert_not_exists "$RUNTIME_HOME/.cache/zsh/z/data" "interactive 启动不会预写 z 索引"
+
+  if run_capture PYENV_VIRTUALENV_LAZY_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "cd '$RUNTIME_PYENV_SUBDIR'; print -r -- \"pyenv_virtualenv=\${TEST_RUNTIME_PYENV_VIRTUALENV:-none} pyenv_virtualenv_init=\${PYENV_VIRTUALENV_INIT:-none} pyenv_virtualenv_hook=\${TEST_RUNTIME_PYENV_VIRTUALENV_HOOK:-none}\"; typeset -f _pyenv_virtualenv_hook >/dev/null 2>&1 && print -r -- \"pyenv_virtualenv_func=yes\""
+  then
+    print_block "pyenv virtualenv lazy" "$PYENV_VIRTUALENV_LAZY_OUT"
+    assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'pyenv_virtualenv=loaded_from_runtime_virtualenv' "进入带 .python-version 的目录后才加载 pyenv virtualenv init"
+    assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'pyenv_virtualenv_init=1' "命中目录后会导出 PYENV_VIRTUALENV_INIT"
+    assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'pyenv_virtualenv_hook=triggered_from_runtime_virtualenv' "lazy virtualenv init 会立刻运行一次 hook"
+    assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'pyenv_virtualenv_func=yes' "lazy virtualenv init 会定义 virtualenv hook 函数"
+  else
+    print_block "pyenv virtualenv lazy" "$PYENV_VIRTUALENV_LAZY_OUT"
+    fail "pyenv virtualenv lazy 验证失败"
+  fi
 
   log STEP "z 目录跳转验证"
 

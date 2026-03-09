@@ -21,6 +21,7 @@ typeset -ga ZSH_LOGIN_FEATURES
 ZSH_LOGIN_FEATURES=(
   brew
   env-path
+  pyenv
 )
 
 # interactive 默认启用几个最基础的交互能力
@@ -29,6 +30,7 @@ typeset -ga ZSH_INTERACTIVE_FEATURES
 ZSH_INTERACTIVE_FEATURES=(
   history
   completion
+  pyenv
   z
   keybinds
   prompt

@@ -425,6 +425,196 @@ path=("${ORIGINAL_PATH[@]}")
 rehash
 unset ZSH_BREW_SHELLENV_TTL TEST_BREW_ENV TEST_BREW_LOAD_COUNT
 
+log STEP "features/pyenv.zsh"
+
+HAD_ZSH_PYENV_ROOT="${+ZSH_PYENV_ROOT}"
+OLD_ZSH_PYENV_ROOT="${ZSH_PYENV_ROOT-}"
+HAD_ZSH_PYENV_INIT_TTL="${+ZSH_PYENV_INIT_TTL}"
+OLD_ZSH_PYENV_INIT_TTL="${ZSH_PYENV_INIT_TTL-}"
+HAD_ZSH_PYENV_REHASH_ON_INIT="${+ZSH_PYENV_REHASH_ON_INIT}"
+OLD_ZSH_PYENV_REHASH_ON_INIT="${ZSH_PYENV_REHASH_ON_INIT-}"
+HAD_ZSH_PYENV_ENABLE_VIRTUALENV_LAZY="${+ZSH_PYENV_ENABLE_VIRTUALENV_LAZY}"
+OLD_ZSH_PYENV_ENABLE_VIRTUALENV_LAZY="${ZSH_PYENV_ENABLE_VIRTUALENV_LAZY-}"
+HAD_ZSH_PYENV_VIRTUALENV_TRIGGER_FILE="${+ZSH_PYENV_VIRTUALENV_TRIGGER_FILE}"
+OLD_ZSH_PYENV_VIRTUALENV_TRIGGER_FILE="${ZSH_PYENV_VIRTUALENV_TRIGGER_FILE-}"
+HAD_ZSH_CURRENT_STAGE="${+ZSH_CURRENT_STAGE}"
+OLD_ZSH_CURRENT_STAGE="${ZSH_CURRENT_STAGE-}"
+HAD_PYENV_ROOT="${+PYENV_ROOT}"
+OLD_PYENV_ROOT="${PYENV_ROOT-}"
+HAD_PYENV_SHELL="${+PYENV_SHELL}"
+OLD_PYENV_SHELL="${PYENV_SHELL-}"
+HAD_PYENV_VIRTUALENV_INIT="${+PYENV_VIRTUALENV_INIT}"
+OLD_PYENV_VIRTUALENV_INIT="${PYENV_VIRTUALENV_INIT-}"
+HAD_PRECMD_FUNCTIONS="${+precmd_functions}"
+typeset -ga TEST_PYENV_SAVED_PRECMD_FUNCTIONS=("${precmd_functions[@]}")
+HAD_CHPWD_FUNCTIONS="${+chpwd_functions}"
+typeset -ga TEST_PYENV_SAVED_CHPWD_FUNCTIONS=("${chpwd_functions[@]}")
+typeset -g TEST_PYENV_SAVED_PWD="$PWD"
+
+typeset -g TEST_PYENV_ROOT="$TMPROOT/fake-pyenv-root"
+typeset -g TEST_PYENV_BIN="$TEST_PYENV_ROOT/bin/pyenv"
+typeset -g TEST_PYENV_SHIMS="$TEST_PYENV_ROOT/shims"
+typeset -g TEST_PYENV_COUNT_FILE="$TMPROOT/fake-pyenv.count"
+typeset -g TEST_PYENV_ARGS_FILE="$TMPROOT/fake-pyenv.args"
+typeset -g TEST_PYENV_REHASH_FILE="$TMPROOT/fake-pyenv.rehash"
+typeset -g TEST_PYENV_COMPLETION_FILE="$TMPROOT/fake-pyenv-completion.zsh"
+typeset -g TEST_PYENV_LINK="$TMPROOT/fake-pyenv-link"
+typeset -g TEST_PYENV_PROJECT="$TMPROOT/fake-pyenv-project"
+typeset -g TEST_PYENV_PROJECT_SUBDIR="$TEST_PYENV_PROJECT/app"
+
+mkdir -p "$TEST_PYENV_ROOT/bin" "$TEST_PYENV_SHIMS"
+mkdir -p "$TEST_PYENV_PROJECT_SUBDIR"
+ln -sf "$TEST_PYENV_BIN" "$TEST_PYENV_LINK"
+print -r -- 'typeset -g TEST_PYENV_COMPLETION_MARK=loaded_from_completion' >| "$TEST_PYENV_COMPLETION_FILE"
+print -r -- "3.11.9/envs/unit" >| "$TEST_PYENV_PROJECT/.python-version"
+
+{
+  print -r -- '#!/bin/sh'
+  print -r -- 'count=0'
+  print -r -- "[ -f \"$TEST_PYENV_COUNT_FILE\" ] && count=\$(cat \"$TEST_PYENV_COUNT_FILE\")"
+  print -r -- 'count=$((count + 1))'
+  print -r -- "printf '%s\n' \"\$count\" > \"$TEST_PYENV_COUNT_FILE\""
+  print -r -- "printf '%s\n' \"\$*\" > \"$TEST_PYENV_ARGS_FILE\""
+  print -r -- 'case "$*" in'
+  print -r -- "  'init --path --no-push-path --no-rehash')"
+  print -r -- "    printf '%s\n' 'typeset -gx TEST_PYENV_LOGIN_MARK=loaded_from_login'"
+  print -r -- "    printf '%s\n' 'if [[ \":\$PATH:\" != *\":$TEST_PYENV_SHIMS:\"* ]]; then export PATH=\"$TEST_PYENV_SHIMS:\${PATH}\"; fi'"
+  print -r -- '    exit 0'
+  print -r -- '    ;;'
+  print -r -- "  'init --path --no-push-path')"
+  print -r -- "    printf '%s\n' 'typeset -gx TEST_PYENV_LOGIN_MARK=loaded_from_login'"
+  print -r -- "    printf '%s\n' 'if [[ \":\$PATH:\" != *\":$TEST_PYENV_SHIMS:\"* ]]; then export PATH=\"$TEST_PYENV_SHIMS:\${PATH}\"; fi'"
+  print -r -- "    printf '%s\n' 'command pyenv rehash'"
+  print -r -- '    exit 0'
+  print -r -- '    ;;'
+  print -r -- "  'init - --no-push-path --no-rehash zsh')"
+  print -r -- "    printf '%s\n' 'typeset -gx TEST_PYENV_INTERACTIVE_MARK=loaded_from_interactive'"
+  print -r -- "    printf '%s\n' 'if [[ \":\$PATH:\" != *\":$TEST_PYENV_SHIMS:\"* ]]; then export PATH=\"$TEST_PYENV_SHIMS:\${PATH}\"; fi'"
+  print -r -- "    printf '%s\n' 'export PYENV_SHELL=zsh'"
+  print -r -- "    printf '%s\n' \"source '$TEST_PYENV_COMPLETION_FILE'\""
+  print -r -- "    printf '%s\n' 'pyenv() { command \"$TEST_PYENV_BIN\" \"\$@\"; }'"
+  print -r -- '    exit 0'
+  print -r -- '    ;;'
+  print -r -- "  'virtualenv-init -')"
+  print -r -- "    printf '%s\n' 'typeset -gx TEST_PYENV_VIRTUALENV_INIT_MARK=loaded_from_virtualenv_init'"
+  print -r -- "    printf '%s\n' 'export PYENV_VIRTUALENV_INIT=1'"
+  print -r -- "    printf '%s\n' '_pyenv_virtualenv_hook() { typeset -gx TEST_PYENV_VIRTUALENV_HOOK=triggered_from_virtualenv_hook; return 0; }'"
+  print -r -- "    printf '%s\n' 'typeset -g -a precmd_functions'"
+  print -r -- "    printf '%s\n' 'if [[ -z \${precmd_functions[(r)_pyenv_virtualenv_hook]:-} ]]; then precmd_functions=(_pyenv_virtualenv_hook \$precmd_functions); fi'"
+  print -r -- '    exit 0'
+  print -r -- '    ;;'
+  print -r -- "  'rehash')"
+  print -r -- "    printf '%s\n' 1 > \"$TEST_PYENV_REHASH_FILE\""
+  print -r -- '    exit 0'
+  print -r -- '    ;;'
+  print -r -- 'esac'
+  print -r -- 'exit 1'
+} >| "$TEST_PYENV_BIN"
+chmod +x "$TEST_PYENV_BIN"
+
+mkdir -p "$TMPROOT/no-pyenv-bin"
+path=("$TMPROOT/no-pyenv-bin" "/usr/bin" "/bin" "/usr/sbin" "/sbin")
+rehash
+
+unset PYENV_ROOT PYENV_SHELL TEST_PYENV_LOGIN_MARK TEST_PYENV_INTERACTIVE_MARK TEST_PYENV_COMPLETION_MARK __zsh_feature_pyenv_loaded
+unfunction pyenv 2>/dev/null || true
+unfunction _pyenv_virtualenv_hook 2>/dev/null || true
+source "$REPO_ROOT/zsh/features/pyenv.zsh" || exit 1
+
+typeset -g ZSH_PYENV_ROOT="$TEST_PYENV_ROOT"
+typeset -g ZSH_PYENV_INIT_TTL=3600
+typeset -gi ZSH_PYENV_REHASH_ON_INIT=0
+typeset -gi ZSH_PYENV_ENABLE_VIRTUALENV_LAZY=1
+typeset -g ZSH_PYENV_VIRTUALENV_TRIGGER_FILE=".python-version"
+typeset -ga precmd_functions=()
+typeset -ga chpwd_functions=()
+
+assert_status 0 "zsh_pyenv_prepare_env exports PYENV_ROOT and adds root/bin" zsh_pyenv_prepare_env
+assert_eq "${PYENV_ROOT:-unset}" "$TEST_PYENV_ROOT" "pyenv feature exports configured PYENV_ROOT"
+assert_eq "${path[1]:-unset}" "$TEST_PYENV_ROOT/bin" "pyenv feature prepends PYENV_ROOT/bin"
+
+assert_status 0 "zsh_pyenv_find_bin finds pyenv in configured root" zsh_pyenv_find_bin
+assert_eq "$REPLY" "${TEST_PYENV_BIN:A}" "pyenv feature resolves configured pyenv binary"
+
+assert_status 0 "zsh_pyenv_cache_key accepts symlink path" zsh_pyenv_cache_key "$TEST_PYENV_LINK" login 0
+assert_contains "$REPLY" "${TEST_PYENV_BIN:A}" "pyenv cache key uses canonical pyenv path"
+
+/bin/rm -f "$TEST_PYENV_COUNT_FILE" "$TEST_PYENV_ARGS_FILE" "$TEST_PYENV_REHASH_FILE"
+unset TEST_PYENV_LOGIN_MARK
+assert_status 0 "zsh_pyenv_load_init sources cached login init" zsh_pyenv_load_init "$TEST_PYENV_BIN" login
+assert_eq "${TEST_PYENV_LOGIN_MARK:-unset}" "loaded_from_login" "pyenv login init updates current shell"
+assert_eq "${path[1]:-unset}" "$TEST_PYENV_SHIMS" "pyenv login init prepends shims path"
+TEST_PYENV_INVOKE_COUNT="$(<"$TEST_PYENV_COUNT_FILE")"
+assert_eq "$TEST_PYENV_INVOKE_COUNT" "1" "pyenv login init invokes pyenv once on cold cache"
+
+unset TEST_PYENV_LOGIN_MARK
+assert_status 0 "zsh_pyenv_load_init reuses fresh login cache" zsh_pyenv_load_init "$TEST_PYENV_BIN" login
+assert_eq "${TEST_PYENV_LOGIN_MARK:-unset}" "loaded_from_login" "pyenv login init can re-source cached output"
+TEST_PYENV_INVOKE_COUNT="$(<"$TEST_PYENV_COUNT_FILE")"
+assert_eq "$TEST_PYENV_INVOKE_COUNT" "1" "pyenv login init avoids re-running pyenv while cache is fresh"
+
+unset TEST_PYENV_INTERACTIVE_MARK TEST_PYENV_COMPLETION_MARK PYENV_SHELL
+unfunction pyenv 2>/dev/null || true
+assert_status 0 "zsh_pyenv_load_init sources cached interactive init" zsh_pyenv_load_init "$TEST_PYENV_BIN" interactive
+assert_eq "${TEST_PYENV_INTERACTIVE_MARK:-unset}" "loaded_from_interactive" "pyenv interactive init updates current shell"
+assert_eq "${PYENV_SHELL:-unset}" "zsh" "pyenv interactive init exports PYENV_SHELL"
+assert_eq "${TEST_PYENV_COMPLETION_MARK:-unset}" "loaded_from_completion" "pyenv interactive init sources completion script"
+assert_true "pyenv interactive init defines pyenv wrapper function" test -n "$(typeset -f pyenv 2>/dev/null)"
+
+/bin/rm -f "$TEST_PYENV_REHASH_FILE"
+typeset -gi ZSH_PYENV_REHASH_ON_INIT=1
+assert_status 0 "zsh_pyenv_load_init can include rehash when enabled" zsh_pyenv_load_init "$TEST_PYENV_BIN" login
+assert_true "pyenv login init runs rehash when enabled" test -f "$TEST_PYENV_REHASH_FILE"
+
+unset TEST_PYENV_VIRTUALENV_INIT_MARK TEST_PYENV_VIRTUALENV_HOOK PYENV_VIRTUALENV_INIT __zsh_feature_pyenv_virtualenv_loaded __zsh_feature_pyenv_bin __zsh_pyenv_virtualenv_lazy_registered
+unfunction _pyenv_virtualenv_hook 2>/dev/null || true
+typeset -ga precmd_functions=()
+typeset -ga chpwd_functions=()
+
+builtin cd -- "$TMPROOT"
+assert_status 1 "zsh_pyenv_find_trigger_file skips unrelated directory" zsh_pyenv_find_trigger_file
+assert_status 0 "zsh_pyenv_enable_virtualenv_lazy only registers watcher" zsh_pyenv_enable_virtualenv_lazy "$TEST_PYENV_BIN"
+assert_eq "${TEST_PYENV_VIRTUALENV_INIT_MARK:-unset}" "unset" "pyenv virtualenv lazy init does not load immediately"
+assert_true "pyenv virtualenv lazy watcher is registered in precmd" test "${precmd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+assert_true "pyenv virtualenv lazy watcher is registered in chpwd" test "${chpwd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+
+builtin cd -- "$TEST_PYENV_PROJECT_SUBDIR"
+assert_status 0 "zsh_pyenv_find_trigger_file walks parent directories" zsh_pyenv_find_trigger_file
+assert_eq "${REPLY:A}" "${TEST_PYENV_PROJECT:A}/.python-version" "pyenv virtualenv lazy trigger follows parent chain"
+assert_status 0 "pyenv virtualenv lazy watcher loads on matching directory" __zsh_pyenv_virtualenv_maybe_load
+assert_eq "${TEST_PYENV_VIRTUALENV_INIT_MARK:-unset}" "loaded_from_virtualenv_init" "pyenv virtualenv init loads after matching trigger file"
+assert_eq "${PYENV_VIRTUALENV_INIT:-unset}" "1" "pyenv virtualenv lazy init exports PYENV_VIRTUALENV_INIT"
+assert_eq "${TEST_PYENV_VIRTUALENV_HOOK:-unset}" "triggered_from_virtualenv_hook" "pyenv virtualenv lazy init runs virtualenv hook immediately after load"
+assert_true "pyenv virtualenv hook function is defined after lazy load" test -n "$(typeset -f _pyenv_virtualenv_hook 2>/dev/null)"
+assert_false "pyenv virtualenv lazy watcher removes precmd hook after load" test "${precmd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+assert_false "pyenv virtualenv lazy watcher removes chpwd hook after load" test "${chpwd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+
+builtin cd -- "$TEST_PYENV_SAVED_PWD"
+path=("${ORIGINAL_PATH[@]}")
+rehash
+unfunction pyenv 2>/dev/null || true
+unfunction _pyenv_virtualenv_hook 2>/dev/null || true
+unset TEST_PYENV_LOGIN_MARK TEST_PYENV_INTERACTIVE_MARK TEST_PYENV_COMPLETION_MARK TEST_PYENV_VIRTUALENV_INIT_MARK TEST_PYENV_VIRTUALENV_HOOK __zsh_feature_pyenv_loaded __zsh_feature_pyenv_virtualenv_loaded __zsh_feature_pyenv_bin __zsh_pyenv_virtualenv_lazy_registered
+restore_var ZSH_PYENV_ROOT "$HAD_ZSH_PYENV_ROOT" "$OLD_ZSH_PYENV_ROOT"
+restore_var ZSH_PYENV_INIT_TTL "$HAD_ZSH_PYENV_INIT_TTL" "$OLD_ZSH_PYENV_INIT_TTL"
+restore_var ZSH_PYENV_REHASH_ON_INIT "$HAD_ZSH_PYENV_REHASH_ON_INIT" "$OLD_ZSH_PYENV_REHASH_ON_INIT"
+restore_var ZSH_PYENV_ENABLE_VIRTUALENV_LAZY "$HAD_ZSH_PYENV_ENABLE_VIRTUALENV_LAZY" "$OLD_ZSH_PYENV_ENABLE_VIRTUALENV_LAZY"
+restore_var ZSH_PYENV_VIRTUALENV_TRIGGER_FILE "$HAD_ZSH_PYENV_VIRTUALENV_TRIGGER_FILE" "$OLD_ZSH_PYENV_VIRTUALENV_TRIGGER_FILE"
+restore_var ZSH_CURRENT_STAGE "$HAD_ZSH_CURRENT_STAGE" "$OLD_ZSH_CURRENT_STAGE"
+restore_var PYENV_ROOT "$HAD_PYENV_ROOT" "$OLD_PYENV_ROOT"
+restore_var PYENV_SHELL "$HAD_PYENV_SHELL" "$OLD_PYENV_SHELL"
+restore_var PYENV_VIRTUALENV_INIT "$HAD_PYENV_VIRTUALENV_INIT" "$OLD_PYENV_VIRTUALENV_INIT"
+if [[ "$HAD_PRECMD_FUNCTIONS" == "1" ]]; then
+  typeset -ga precmd_functions=("${TEST_PYENV_SAVED_PRECMD_FUNCTIONS[@]}")
+else
+  unset precmd_functions
+fi
+if [[ "$HAD_CHPWD_FUNCTIONS" == "1" ]]; then
+  typeset -ga chpwd_functions=("${TEST_PYENV_SAVED_CHPWD_FUNCTIONS[@]}")
+else
+  unset chpwd_functions
+fi
+
 log STEP "features/autosuggestions.zsh"
 
 typeset -g TEST_AUTOSUGGESTIONS_ROOT="$TMPROOT/fake-autosuggestions"
@@ -496,6 +686,95 @@ assert_eq "$REPLY" "$TEST_AUTOSUGGESTIONS_FILE" "autosuggestions feature prefers
 
 path=("${ORIGINAL_PATH[@]}")
 rehash
+
+log STEP "features/prompt and themes/avit.zsh"
+
+HAD_ZSH_THEME="${+ZSH_THEME}"
+OLD_ZSH_THEME="${ZSH_THEME-}"
+HAD_ZSH_KEYMAP="${+ZSH_KEYMAP}"
+OLD_ZSH_KEYMAP="${ZSH_KEYMAP-}"
+HAD_ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT="${+ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT}"
+OLD_ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT="${ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT-}"
+HAD_VIRTUAL_ENV_DISABLE_PROMPT="${+VIRTUAL_ENV_DISABLE_PROMPT}"
+OLD_VIRTUAL_ENV_DISABLE_PROMPT="${VIRTUAL_ENV_DISABLE_PROMPT-}"
+HAD_PYENV_VIRTUALENV_DISABLE_PROMPT="${+PYENV_VIRTUALENV_DISABLE_PROMPT}"
+OLD_PYENV_VIRTUALENV_DISABLE_PROMPT="${PYENV_VIRTUALENV_DISABLE_PROMPT-}"
+HAD_CONDA_CHANGEPS1="${+CONDA_CHANGEPS1}"
+OLD_CONDA_CHANGEPS1="${CONDA_CHANGEPS1-}"
+HAD_VIRTUAL_ENV="${+VIRTUAL_ENV}"
+OLD_VIRTUAL_ENV="${VIRTUAL_ENV-}"
+HAD_VIRTUAL_ENV_PROMPT="${+VIRTUAL_ENV_PROMPT}"
+OLD_VIRTUAL_ENV_PROMPT="${VIRTUAL_ENV_PROMPT-}"
+HAD_PIPENV_ACTIVE="${+PIPENV_ACTIVE}"
+OLD_PIPENV_ACTIVE="${PIPENV_ACTIVE-}"
+HAD_PIPENV_PIPFILE="${+PIPENV_PIPFILE}"
+OLD_PIPENV_PIPFILE="${PIPENV_PIPFILE-}"
+HAD_PIPENV_PROMPT="${+PIPENV_PROMPT}"
+OLD_PIPENV_PROMPT="${PIPENV_PROMPT-}"
+HAD_CONDA_DEFAULT_ENV="${+CONDA_DEFAULT_ENV}"
+OLD_CONDA_DEFAULT_ENV="${CONDA_DEFAULT_ENV-}"
+HAD_THEME_GUARD="${+__zsh_theme_avit_loaded}"
+OLD_THEME_GUARD="${__zsh_theme_avit_loaded-}"
+
+unset __zsh_theme_avit_loaded
+unset VIRTUAL_ENV_DISABLE_PROMPT PYENV_VIRTUALENV_DISABLE_PROMPT CONDA_CHANGEPS1
+unset VIRTUAL_ENV VIRTUAL_ENV_PROMPT PIPENV_ACTIVE PIPENV_PIPFILE PIPENV_PROMPT CONDA_DEFAULT_ENV
+typeset -g ZSH_THEME="avit"
+typeset -g ZSH_KEYMAP="emacs"
+typeset -gi ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT=1
+
+source "$REPO_ROOT/zsh/features/prompt.zsh" || exit 1
+
+assert_eq "${VIRTUAL_ENV_DISABLE_PROMPT:-unset}" "1" "avit 默认关闭 virtualenv prompt 注入"
+assert_eq "${PYENV_VIRTUALENV_DISABLE_PROMPT:-unset}" "1" "avit 默认关闭 pyenv-virtualenv prompt 注入"
+assert_eq "${CONDA_CHANGEPS1:-unset}" "no" "avit 默认关闭 conda prompt 注入"
+
+VIRTUAL_ENV_PROMPT='(excel_lab) '
+VIRTUAL_ENV="$TMPROOT/excel_lab-cvFsw0f3"
+__zsh_avit_build_virtualenv_segment
+assert_eq "$REPLY" "%F{magenta}(excel_lab)%f " "avit 优先使用工具提供的环境展示名"
+
+unset VIRTUAL_ENV_PROMPT VIRTUAL_ENV
+PIPENV_ACTIVE=1
+PIPENV_PIPFILE="$TMPROOT/pipenv-demo/Pipfile"
+mkdir -p "${PIPENV_PIPFILE:h}"
+print -r -- "[packages]" >| "$PIPENV_PIPFILE"
+__zsh_avit_build_virtualenv_segment
+assert_eq "$REPLY" "%F{magenta}(pipenv-demo)%f " "avit 在 pipenv 下回退到项目目录名"
+
+unset PIPENV_ACTIVE PIPENV_PIPFILE
+VIRTUAL_ENV="$TMPROOT/plain-venv"
+__zsh_avit_build_virtualenv_segment
+assert_eq "$REPLY" "%F{magenta}(plain-venv)%f " "avit 在普通 virtualenv 下回退到环境目录名"
+
+unset VIRTUAL_ENV
+CONDA_DEFAULT_ENV="ml"
+__zsh_avit_build_virtualenv_segment
+assert_eq "$REPLY" "%F{magenta}(ml)%f " "avit 支持 conda 环境名"
+
+PROMPT_MANAGE_OFF_OUT="$(
+  unset __zsh_theme_avit_loaded
+  unset VIRTUAL_ENV_DISABLE_PROMPT PYENV_VIRTUALENV_DISABLE_PROMPT CONDA_CHANGEPS1
+  typeset -g ZSH_KEYMAP="emacs"
+  typeset -gi ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT=0
+  source "$REPO_ROOT/zsh/themes/avit.zsh" || exit 1
+  print -r -- "${VIRTUAL_ENV_DISABLE_PROMPT-unset}:${PYENV_VIRTUALENV_DISABLE_PROMPT-unset}:${CONDA_CHANGEPS1-unset}"
+)"
+assert_eq "$PROMPT_MANAGE_OFF_OUT" "unset:unset:unset" "avit 允许通过声明式配置放弃接管 Python prompt"
+
+restore_var ZSH_THEME "$HAD_ZSH_THEME" "$OLD_ZSH_THEME"
+restore_var ZSH_KEYMAP "$HAD_ZSH_KEYMAP" "$OLD_ZSH_KEYMAP"
+restore_var ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT "$HAD_ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT" "$OLD_ZSH_THEME_AVIT_MANAGE_PYTHON_PROMPT"
+restore_var VIRTUAL_ENV_DISABLE_PROMPT "$HAD_VIRTUAL_ENV_DISABLE_PROMPT" "$OLD_VIRTUAL_ENV_DISABLE_PROMPT"
+restore_var PYENV_VIRTUALENV_DISABLE_PROMPT "$HAD_PYENV_VIRTUALENV_DISABLE_PROMPT" "$OLD_PYENV_VIRTUALENV_DISABLE_PROMPT"
+restore_var CONDA_CHANGEPS1 "$HAD_CONDA_CHANGEPS1" "$OLD_CONDA_CHANGEPS1"
+restore_var VIRTUAL_ENV "$HAD_VIRTUAL_ENV" "$OLD_VIRTUAL_ENV"
+restore_var VIRTUAL_ENV_PROMPT "$HAD_VIRTUAL_ENV_PROMPT" "$OLD_VIRTUAL_ENV_PROMPT"
+restore_var PIPENV_ACTIVE "$HAD_PIPENV_ACTIVE" "$OLD_PIPENV_ACTIVE"
+restore_var PIPENV_PIPFILE "$HAD_PIPENV_PIPFILE" "$OLD_PIPENV_PIPFILE"
+restore_var PIPENV_PROMPT "$HAD_PIPENV_PROMPT" "$OLD_PIPENV_PROMPT"
+restore_var CONDA_DEFAULT_ENV "$HAD_CONDA_DEFAULT_ENV" "$OLD_CONDA_DEFAULT_ENV"
+restore_var __zsh_theme_avit_loaded "$HAD_THEME_GUARD" "$OLD_THEME_GUARD"
 
 log STEP "40-lazy.zsh"
 
