@@ -517,13 +517,15 @@ EOF
 
   assert_not_exists "$RUNTIME_HOME/.cache/zsh/z/data" "interactive 启动不会预写 z 索引"
 
-  if run_capture PYENV_VIRTUALENV_LAZY_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "cd '$RUNTIME_PYENV_SUBDIR'; print -r -- \"pyenv_virtualenv=\${TEST_RUNTIME_PYENV_VIRTUALENV:-none} pyenv_virtualenv_init=\${PYENV_VIRTUALENV_INIT:-none} pyenv_virtualenv_hook=\${TEST_RUNTIME_PYENV_VIRTUALENV_HOOK:-none}\"; typeset -f _pyenv_virtualenv_hook >/dev/null 2>&1 && print -r -- \"pyenv_virtualenv_func=yes\""
+  if run_capture PYENV_VIRTUALENV_LAZY_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "cd '$RUNTIME_PYENV_SUBDIR'; print -r -- \"pyenv_virtualenv=\${TEST_RUNTIME_PYENV_VIRTUALENV:-none} pyenv_virtualenv_init=\${PYENV_VIRTUALENV_INIT:-none} pyenv_virtualenv_hook=\${TEST_RUNTIME_PYENV_VIRTUALENV_HOOK:-none}\"; typeset -f _pyenv_virtualenv_hook >/dev/null 2>&1 && print -r -- \"pyenv_virtualenv_func=yes\"; print -r -- \"hook_precmd=\${precmd_functions[(Ie)_pyenv_virtualenv_hook]:-0} hook_chpwd=\${chpwd_functions[(Ie)_pyenv_virtualenv_hook]:-0}\""
   then
     print_block "pyenv virtualenv lazy" "$PYENV_VIRTUALENV_LAZY_OUT"
     assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'pyenv_virtualenv=loaded_from_runtime_virtualenv' "进入带 .python-version 的目录后才加载 pyenv virtualenv init"
     assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'pyenv_virtualenv_init=1' "命中目录后会导出 PYENV_VIRTUALENV_INIT"
     assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'pyenv_virtualenv_hook=triggered_from_runtime_virtualenv' "lazy virtualenv init 会立刻运行一次 hook"
     assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'pyenv_virtualenv_func=yes' "lazy virtualenv init 会定义 virtualenv hook 函数"
+    assert_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'hook_precmd=0' "默认不会把 pyenv virtualenv hook 留在 precmd"
+    assert_not_contains "$PYENV_VIRTUALENV_LAZY_OUT" 'hook_chpwd=0' "默认会把 pyenv virtualenv hook 挂到 chpwd"
   else
     print_block "pyenv virtualenv lazy" "$PYENV_VIRTUALENV_LAZY_OUT"
     fail "pyenv virtualenv lazy 验证失败"

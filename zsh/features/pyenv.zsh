@@ -340,6 +340,46 @@ zsh_pyenv_disable_virtualenv_lazy() {
 }
 
 # --------------------------------------------------
+# zsh_pyenv_virtualenv_hook_mode
+# --------------------------------------------------
+# 计算 pyenv-virtualenv hook 的挂载位置.
+# 默认走 chpwd, 避免每次空回车都触发 pyenv 检查.
+zsh_pyenv_virtualenv_hook_mode() {
+  local mode="${ZSH_PYENV_VIRTUALENV_HOOK_MODE:-chpwd}"
+
+  case "$mode" in
+    chpwd|precmd)
+      REPLY="$mode"
+      return 0
+      ;;
+  esac
+
+  zsh_log_debug "pyenv: virtualenv hook-mode invalid=$mode fallback=chpwd"
+  REPLY="chpwd"
+}
+
+# --------------------------------------------------
+# zsh_pyenv_register_virtualenv_hook
+# --------------------------------------------------
+# 统一接管 pyenv-virtualenv 的 hook 挂载点.
+# 官方输出默认写进 precmd, 这里按项目策略改挂到 chpwd 或保留 precmd.
+zsh_pyenv_register_virtualenv_hook() {
+  local mode=''
+
+  (( $+functions[_pyenv_virtualenv_hook] )) || return 0
+
+  zsh_pyenv_virtualenv_hook_mode
+  mode="$REPLY"
+
+  autoload -Uz add-zsh-hook
+  add-zsh-hook -d precmd _pyenv_virtualenv_hook 2>/dev/null || true
+  add-zsh-hook -d chpwd _pyenv_virtualenv_hook 2>/dev/null || true
+  add-zsh-hook "$mode" _pyenv_virtualenv_hook
+
+  zsh_log_debug "pyenv: virtualenv hook register mode=$mode"
+}
+
+# --------------------------------------------------
 # __zsh_pyenv_virtualenv_maybe_load
 # --------------------------------------------------
 # 只在进入带 .python-version 的目录上下文时再加载 virtualenv-init
@@ -376,6 +416,7 @@ __zsh_pyenv_virtualenv_maybe_load() {
 
   typeset -g __zsh_feature_pyenv_virtualenv_loaded=1
   zsh_pyenv_disable_virtualenv_lazy
+  zsh_pyenv_register_virtualenv_hook
 
   if (( $+functions[_pyenv_virtualenv_hook] )); then
     _pyenv_virtualenv_hook >/dev/null 2>&1 || true
@@ -397,6 +438,7 @@ zsh_pyenv_enable_virtualenv_lazy() {
 
   if [[ -n "${__zsh_feature_pyenv_virtualenv_loaded:-}" || "${PYENV_VIRTUALENV_INIT:-0}" == "1" ]]; then
     typeset -g __zsh_feature_pyenv_virtualenv_loaded=1
+    zsh_pyenv_register_virtualenv_hook
     return 0
   fi
 

@@ -445,6 +445,8 @@ HAD_ZSH_PYENV_REHASH_ON_INIT="${+ZSH_PYENV_REHASH_ON_INIT}"
 OLD_ZSH_PYENV_REHASH_ON_INIT="${ZSH_PYENV_REHASH_ON_INIT-}"
 HAD_ZSH_PYENV_ENABLE_VIRTUALENV_LAZY="${+ZSH_PYENV_ENABLE_VIRTUALENV_LAZY}"
 OLD_ZSH_PYENV_ENABLE_VIRTUALENV_LAZY="${ZSH_PYENV_ENABLE_VIRTUALENV_LAZY-}"
+HAD_ZSH_PYENV_VIRTUALENV_HOOK_MODE="${+ZSH_PYENV_VIRTUALENV_HOOK_MODE}"
+OLD_ZSH_PYENV_VIRTUALENV_HOOK_MODE="${ZSH_PYENV_VIRTUALENV_HOOK_MODE-}"
 HAD_ZSH_PYENV_VIRTUALENV_TRIGGER_FILE="${+ZSH_PYENV_VIRTUALENV_TRIGGER_FILE}"
 OLD_ZSH_PYENV_VIRTUALENV_TRIGGER_FILE="${ZSH_PYENV_VIRTUALENV_TRIGGER_FILE-}"
 HAD_ZSH_CURRENT_STAGE="${+ZSH_CURRENT_STAGE}"
@@ -535,6 +537,7 @@ typeset -g ZSH_PYENV_ROOT="$TEST_PYENV_ROOT"
 typeset -g ZSH_PYENV_INIT_TTL=3600
 typeset -gi ZSH_PYENV_REHASH_ON_INIT=0
 typeset -gi ZSH_PYENV_ENABLE_VIRTUALENV_LAZY=1
+typeset -g ZSH_PYENV_VIRTUALENV_HOOK_MODE="chpwd"
 typeset -g ZSH_PYENV_VIRTUALENV_TRIGGER_FILE=".python-version"
 typeset -ga precmd_functions=()
 typeset -ga chpwd_functions=()
@@ -598,6 +601,8 @@ assert_eq "${TEST_PYENV_VIRTUALENV_HOOK:-unset}" "triggered_from_virtualenv_hook
 assert_true "pyenv virtualenv hook function is defined after lazy load" test -n "$(typeset -f _pyenv_virtualenv_hook 2>/dev/null)"
 assert_false "pyenv virtualenv lazy watcher removes precmd hook after load" test "${precmd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
 assert_false "pyenv virtualenv lazy watcher removes chpwd hook after load" test "${chpwd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+assert_false "pyenv virtualenv hook is not kept on precmd in chpwd mode" test "${precmd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
+assert_true "pyenv virtualenv hook is moved to chpwd in chpwd mode" test "${chpwd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
 
 unset TEST_PYENV_VIRTUALENV_INIT_MARK TEST_PYENV_VIRTUALENV_HOOK PYENV_VIRTUALENV_INIT __zsh_feature_pyenv_virtualenv_loaded __zsh_feature_pyenv_bin __zsh_pyenv_virtualenv_lazy_registered
 unfunction _pyenv_virtualenv_hook 2>/dev/null || true
@@ -611,6 +616,19 @@ assert_eq "${PYENV_VIRTUALENV_INIT:-unset}" "1" "matching startup directory stil
 assert_eq "${TEST_PYENV_VIRTUALENV_HOOK:-unset}" "triggered_from_virtualenv_hook" "matching startup directory still runs virtualenv hook"
 assert_false "matching startup directory does not leave precmd watcher behind" test "${precmd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
 assert_false "matching startup directory does not leave chpwd watcher behind" test "${chpwd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+assert_false "matching startup directory also avoids precmd virtualenv hook" test "${precmd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
+assert_true "matching startup directory keeps virtualenv hook on chpwd" test "${chpwd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
+
+unset TEST_PYENV_VIRTUALENV_INIT_MARK TEST_PYENV_VIRTUALENV_HOOK PYENV_VIRTUALENV_INIT __zsh_feature_pyenv_virtualenv_loaded __zsh_feature_pyenv_bin __zsh_pyenv_virtualenv_lazy_registered
+unfunction _pyenv_virtualenv_hook 2>/dev/null || true
+typeset -ga precmd_functions=()
+typeset -ga chpwd_functions=()
+typeset -g ZSH_PYENV_VIRTUALENV_HOOK_MODE="precmd"
+
+builtin cd -- "$TEST_PYENV_PROJECT_SUBDIR"
+assert_status 0 "zsh_pyenv_enable_virtualenv_lazy can preserve precmd virtualenv hook when requested" zsh_pyenv_enable_virtualenv_lazy "$TEST_PYENV_BIN"
+assert_true "precmd hook mode keeps pyenv virtualenv hook on precmd" test "${precmd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
+assert_false "precmd hook mode does not add pyenv virtualenv hook to chpwd" test "${chpwd_functions[(Ie)_pyenv_virtualenv_hook]}" -gt 0
 
 builtin cd -- "$TEST_PYENV_SAVED_PWD"
 path=("${ORIGINAL_PATH[@]}")
@@ -622,6 +640,7 @@ restore_var ZSH_PYENV_ROOT "$HAD_ZSH_PYENV_ROOT" "$OLD_ZSH_PYENV_ROOT"
 restore_var ZSH_PYENV_INIT_TTL "$HAD_ZSH_PYENV_INIT_TTL" "$OLD_ZSH_PYENV_INIT_TTL"
 restore_var ZSH_PYENV_REHASH_ON_INIT "$HAD_ZSH_PYENV_REHASH_ON_INIT" "$OLD_ZSH_PYENV_REHASH_ON_INIT"
 restore_var ZSH_PYENV_ENABLE_VIRTUALENV_LAZY "$HAD_ZSH_PYENV_ENABLE_VIRTUALENV_LAZY" "$OLD_ZSH_PYENV_ENABLE_VIRTUALENV_LAZY"
+restore_var ZSH_PYENV_VIRTUALENV_HOOK_MODE "$HAD_ZSH_PYENV_VIRTUALENV_HOOK_MODE" "$OLD_ZSH_PYENV_VIRTUALENV_HOOK_MODE"
 restore_var ZSH_PYENV_VIRTUALENV_TRIGGER_FILE "$HAD_ZSH_PYENV_VIRTUALENV_TRIGGER_FILE" "$OLD_ZSH_PYENV_VIRTUALENV_TRIGGER_FILE"
 restore_var ZSH_CURRENT_STAGE "$HAD_ZSH_CURRENT_STAGE" "$OLD_ZSH_CURRENT_STAGE"
 restore_var PYENV_ROOT "$HAD_PYENV_ROOT" "$OLD_PYENV_ROOT"
