@@ -301,10 +301,17 @@ assert_false "zcache_is_fresh rejects stale cache" zcache_is_fresh "$CACHE_FILE"
 assert_status 2 "zcache_ensure_cmd validates usage" zcache_ensure_cmd "bad"
 assert_status 0 "zcache_ensure_cmd rebuilds missing cache" zcache_ensure_cmd "unit-cache" 60 -- print -r -- 'typeset -g TEST_CACHE_FILE=ready'
 assert_file_readable "$REPLY" "zcache_ensure_cmd returns readable cache file"
+ZCACHE_MISS_DEBUG_OUT="$({ ZSH_DEBUG=1; zcache_ensure_cmd "debug-cache" 60 -- print -r -- 'typeset -g TEST_DEBUG_CACHE=ready'; } 2>&1)"
+assert_contains "$ZCACHE_MISS_DEBUG_OUT" "zcache: ensure cache-miss key=debug-cache" "zcache debug 输出 cache miss"
+assert_contains "$ZCACHE_MISS_DEBUG_OUT" "zcache: ensure refresh-done key=debug-cache" "zcache debug 输出 refresh 完成"
+ZCACHE_HIT_DEBUG_OUT="$({ ZSH_DEBUG=1; zcache_ensure_cmd "debug-cache" 60 -- print -r -- 'typeset -g TEST_DEBUG_CACHE=changed'; } 2>&1)"
+assert_contains "$ZCACHE_HIT_DEBUG_OUT" "zcache: ensure cache-hit key=debug-cache" "zcache debug 输出 cache hit"
 
 unset TEST_CACHE_VALUE
 assert_status 0 "zcache_source_cmd sources trusted cache file" zcache_source_cmd "unit-cache-source" 60 -- print -r -- 'typeset -g TEST_CACHE_VALUE=from_cache'
 assert_eq "${TEST_CACHE_VALUE:-unset}" "from_cache" "zcache_source_cmd updates current shell"
+ZCACHE_SOURCE_DEBUG_OUT="$({ ZSH_DEBUG=1; zcache_source_cmd "debug-cache" 60 -- print -r -- 'typeset -g TEST_DEBUG_CACHE=changed_again'; } 2>&1)"
+assert_contains "$ZCACHE_SOURCE_DEBUG_OUT" "zcache: source file=" "zcache debug 输出 source 文件路径"
 zcache_path "unit-cache-source"
 SOURCE_CACHE_FILE="$REPLY"
 assert_status 0 "zcache_invalidate removes cache file" zcache_invalidate "unit-cache-source"
@@ -344,6 +351,9 @@ assert_eq "$REPLY" "/home/linuxbrew/.linuxbrew/bin/brew" "Linux 默认 brew 路�
 ZSH_OS="unknown"
 ZSH_ARCH="unknown"
 assert_status 1 "zsh_brew_default_bin skips unsupported platform" zsh_brew_default_bin
+
+BREW_DEFAULT_DEBUG_OUT="$({ ZSH_DEBUG=1; ZSH_OS="macos"; ZSH_ARCH="arm64"; zsh_brew_default_bin >/dev/null; } 2>&1)"
+assert_contains "$BREW_DEFAULT_DEBUG_OUT" "brew: default-bin return=0 brew=/opt/homebrew/bin/brew" "brew default-bin debug 输出结果路径"
 
 restore_var ZSH_OS "$HAD_ZSH_OS" "$OLD_ZSH_OS"
 restore_var ZSH_ARCH "$HAD_ZSH_ARCH" "$OLD_ZSH_ARCH"
@@ -407,6 +417,9 @@ assert_eq "${TEST_BREW_ENV:-unset}" "loaded_from_fake_brew" "brew feature can re
 assert_eq "${TEST_BREW_LOAD_COUNT:-unset}" "1" "cached shellenv keeps original content"
 TEST_BREW_INVOKE_COUNT="$(<"$TEST_BREW_COUNT_FILE")"
 assert_eq "$TEST_BREW_INVOKE_COUNT" "1" "brew feature avoids re-running brew while cache is fresh"
+BREW_INIT_DEBUG_OUT="$({ ZSH_DEBUG=1; zsh_brew_init >/dev/null; } 2>&1)"
+assert_contains "$BREW_INIT_DEBUG_OUT" "brew: init brew=$TEST_BREW_BIN" "brew init debug 输出找到的 brew 路径"
+assert_contains "$BREW_INIT_DEBUG_OUT" "brew: load-shellenv return=0 brew=$TEST_BREW_BIN" "brew init debug 输出 shellenv 加载结果"
 
 path=("${ORIGINAL_PATH[@]}")
 rehash

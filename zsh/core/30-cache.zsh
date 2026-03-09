@@ -181,26 +181,42 @@ zcache_is_fresh() {
   local age
 
   # 文件不可读 直接视为不新鲜
-  [[ -r "$file" ]] || return 1
+  if [[ ! -r "$file" ]]; then
+    zsh_log_debug "zcache: fresh-check return=1 reason=unreadable file=$file"
+    return 1
+  fi
 
   # 如果 TTL 不是纯数字 回退到默认 TTL
-  [[ "$ttl" == <-> ]] || ttl="$ZSH_CACHE_DEFAULT_TTL"
+  if [[ "$ttl" != <-> ]]; then
+    zsh_log_debug "zcache: fresh-check invalid-ttl ttl=$ttl fallback=$ZSH_CACHE_DEFAULT_TTL file=$file"
+    ttl="$ZSH_CACHE_DEFAULT_TTL"
+  fi
 
   # TTL = 0 的特殊语义
   # 只要文件存在 就视为新鲜
   if (( ttl == 0 )); then
+    zsh_log_debug "zcache: fresh-check return=0 reason=ttl-zero file=$file"
     return 0
   fi
 
   # 读不到 mtime 则保守起见 视为不新鲜
-  zcache_get_mtime "$file" || return 1
+  if ! zcache_get_mtime "$file"; then
+    zsh_log_debug "zcache: fresh-check return=1 reason=mtime-unavailable file=$file"
+    return 1
+  fi
   mtime="$REPLY"
 
   # 获取当前时间戳
-  now="$(date +%s 2>/dev/null)" || return 1
+  if ! now="$(date +%s 2>/dev/null)"; then
+    zsh_log_debug "zcache: fresh-check return=1 reason=clock-unavailable file=$file"
+    return 1
+  fi
 
   # 拿不到纯数字时间戳 也保守地视为不新鲜
-  [[ "$now" == <-> ]] || return 1
+  if [[ "$now" != <-> ]]; then
+    zsh_log_debug "zcache: fresh-check return=1 reason=clock-invalid now=$now file=$file"
+    return 1
+  fi
 
   # 计算缓存年龄 当前时间 - 文件修改时间
   age=$(( now - mtime ))
@@ -212,7 +228,13 @@ zcache_is_fresh() {
   fi
 
   # 年龄小于等于 TTL 则认为新鲜
-  (( age <= ttl ))
+  if (( age <= ttl )); then
+    zsh_log_debug "zcache: fresh-check return=0 age=$age ttl=$ttl file=$file"
+    return 0
+  fi
+
+  zsh_log_debug "zcache: fresh-check return=1 age=$age ttl=$ttl file=$file"
+  return 1
 }
 
 # --------------------------------------------------
@@ -322,11 +344,16 @@ zcache_ensure_cmd() {
   zcache_path "$cache_key"
   cache_file="$REPLY"
 
+  zsh_log_debug "zcache: ensure start key=$cache_key ttl=$ttl file=$cache_file"
+
   # 如果缓存仍然新鲜 直接返回缓存文件路径 不重建
   if zcache_is_fresh "$cache_file" "$ttl"; then
+    zsh_log_debug "zcache: ensure cache-hit key=$cache_key file=$cache_file"
     REPLY="$cache_file"
     return 0
   fi
+
+  zsh_log_debug "zcache: ensure cache-miss key=$cache_key file=$cache_file"
 
   # 确保缓存目录存在
   zsh_ensure_dir "$ZSH_CACHE_SNIPPET_DIR"
@@ -343,6 +370,7 @@ zcache_ensure_cmd() {
   # 也允许我们明确覆盖临时文件
   # 这个命令的输出 预期应该是 可被 source 的 shell 代码
   if "$@" >| "$tmp_file"; then
+    zsh_log_debug "zcache: ensure command-ok key=$cache_key tmp=$tmp_file"
     :
   else
     rc=$?
@@ -352,6 +380,7 @@ zcache_ensure_cmd() {
 
     # 输出错误信息到 stderr
     print -r -- "[zcache] command failed while rebuilding cache: $cache_key" >&2
+    zsh_log_debug "zcache: ensure return=$rc reason=command-failed key=$cache_key"
 
     # 把原始失败码返回给调用方 便于上层判断
     return "$rc"
@@ -360,6 +389,7 @@ zcache_ensure_cmd() {
   # 使用 mv 原子替换正式缓存文件
   # 这样如果 shell 中途被打断 正式缓存文件也更不容易处于半写入状态
   if mv "$tmp_file" "$cache_file"; then
+    zsh_log_debug "zcache: ensure refresh-done key=$cache_key file=$cache_file"
     :
   else
     rc=$?
@@ -369,6 +399,7 @@ zcache_ensure_cmd() {
 
     # 输出错误信息
     print -r -- "[zcache] failed to move temp cache file into place: $cache_file" >&2
+    zsh_log_debug "zcache: ensure return=$rc reason=move-failed key=$cache_key file=$cache_file"
 
     # 返回 mv 的失败码
     return "$rc"
@@ -376,6 +407,7 @@ zcache_ensure_cmd() {
 
   # 成功后 通过 REPLY 返回正式缓存文件路径
   REPLY="$cache_file"
+  zsh_log_debug "zcache: ensure return=0 key=$cache_key file=$cache_file"
   return 0
 }
 
@@ -398,7 +430,14 @@ zcache_ensure_cmd() {
 # 不要把不可信来源的文本拿来缓存并 source
 zcache_source_cmd() {
   # 先确保缓存文件存在且可用
-  zcache_ensure_cmd "$@" || return $?
+  local rc
+
+  zcache_ensure_cmd "$@"
+  rc=$?
+  if (( rc != 0 )); then
+    zsh_log_debug "zcache: source return=$rc reason=ensure-failed"
+    return "$rc"
+  fi
 
   # 接收缓存文件路径
   local cache_file="$REPLY"
@@ -406,10 +445,15 @@ zcache_source_cmd() {
   # 再次做一个可读检查
   if [[ ! -r "$cache_file" ]]; then
     print -r -- "[zcache] cache file is not readable: $cache_file" >&2
+    zsh_log_debug "zcache: source return=1 reason=unreadable file=$cache_file"
     return 1
   fi
 
   # 在当前 shell 中 source 缓存文件
   # 必须 source 而不是开子进程执行 否则环境变量/PATH 变更不会回到当前 shell
+  zsh_log_debug "zcache: source file=$cache_file"
   source "$cache_file"
+  rc=$?
+  zsh_log_debug "zcache: source return=$rc file=$cache_file"
+  return "$rc"
 }
