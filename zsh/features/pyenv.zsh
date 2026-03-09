@@ -388,7 +388,8 @@ __zsh_pyenv_virtualenv_maybe_load() {
 # --------------------------------------------------
 # zsh_pyenv_enable_virtualenv_lazy
 # --------------------------------------------------
-# interactive 阶段只注册轻量 watcher, 真正的 virtualenv-init 延后到命中目录再加载
+# interactive 阶段只在当前目录检查一次, 然后注册 chpwd watcher.
+# 这样既能覆盖 shell 一开始就落在 Python 项目里的场景, 也避免每个 prompt 都重复扫父目录链.
 zsh_pyenv_enable_virtualenv_lazy() {
   local pyenv_bin="$1"
 
@@ -406,9 +407,10 @@ zsh_pyenv_enable_virtualenv_lazy() {
   fi
 
   autoload -Uz add-zsh-hook
-  add-zsh-hook precmd __zsh_pyenv_virtualenv_maybe_load
   add-zsh-hook chpwd __zsh_pyenv_virtualenv_maybe_load
   typeset -g __zsh_pyenv_virtualenv_lazy_registered=1
+
+  __zsh_pyenv_virtualenv_maybe_load
 }
 
 # --------------------------------------------------

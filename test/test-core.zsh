@@ -285,6 +285,16 @@ zcache_path "tool/shellenv zsh"
 CACHE_FILE="$REPLY"
 assert_eq "$CACHE_FILE" "$ZSH_CACHE_SNIPPET_DIR/tool_shellenv_zsh.zsh" "zcache_path builds cache file path"
 
+LONG_CACHE_KEY=""
+while (( ${#LONG_CACHE_KEY} < 260 )); do
+  LONG_CACHE_KEY+="pyenv-init:"
+done
+zcache_path "$LONG_CACHE_KEY"
+LONG_CACHE_FILE="$REPLY"
+LONG_CACHE_BASE="${LONG_CACHE_FILE:t}"
+assert_true "zcache_path compacts overlong cache filenames" test "${#LONG_CACHE_BASE}" -lt 128
+assert_contains "$LONG_CACHE_BASE" "pyenv-init_pyenv-init" "zcache_path keeps a readable prefix for long keys"
+
 print -r -- "cached" >| "$CACHE_FILE"
 assert_status 0 "zcache_get_mtime reads cache file mtime" zcache_get_mtime "$CACHE_FILE"
 if [[ "$REPLY" == <-> ]]; then
@@ -575,7 +585,7 @@ builtin cd -- "$TMPROOT"
 assert_status 1 "zsh_pyenv_find_trigger_file skips unrelated directory" zsh_pyenv_find_trigger_file
 assert_status 0 "zsh_pyenv_enable_virtualenv_lazy only registers watcher" zsh_pyenv_enable_virtualenv_lazy "$TEST_PYENV_BIN"
 assert_eq "${TEST_PYENV_VIRTUALENV_INIT_MARK:-unset}" "unset" "pyenv virtualenv lazy init does not load immediately"
-assert_true "pyenv virtualenv lazy watcher is registered in precmd" test "${precmd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+assert_false "pyenv virtualenv lazy watcher does not register precmd" test "${precmd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
 assert_true "pyenv virtualenv lazy watcher is registered in chpwd" test "${chpwd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
 
 builtin cd -- "$TEST_PYENV_PROJECT_SUBDIR"
@@ -588,6 +598,19 @@ assert_eq "${TEST_PYENV_VIRTUALENV_HOOK:-unset}" "triggered_from_virtualenv_hook
 assert_true "pyenv virtualenv hook function is defined after lazy load" test -n "$(typeset -f _pyenv_virtualenv_hook 2>/dev/null)"
 assert_false "pyenv virtualenv lazy watcher removes precmd hook after load" test "${precmd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
 assert_false "pyenv virtualenv lazy watcher removes chpwd hook after load" test "${chpwd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+
+unset TEST_PYENV_VIRTUALENV_INIT_MARK TEST_PYENV_VIRTUALENV_HOOK PYENV_VIRTUALENV_INIT __zsh_feature_pyenv_virtualenv_loaded __zsh_feature_pyenv_bin __zsh_pyenv_virtualenv_lazy_registered
+unfunction _pyenv_virtualenv_hook 2>/dev/null || true
+typeset -ga precmd_functions=()
+typeset -ga chpwd_functions=()
+
+builtin cd -- "$TEST_PYENV_PROJECT_SUBDIR"
+assert_status 0 "zsh_pyenv_enable_virtualenv_lazy loads immediately when current directory already matches" zsh_pyenv_enable_virtualenv_lazy "$TEST_PYENV_BIN"
+assert_eq "${TEST_PYENV_VIRTUALENV_INIT_MARK:-unset}" "loaded_from_virtualenv_init" "pyenv virtualenv lazy init covers matching startup directory"
+assert_eq "${PYENV_VIRTUALENV_INIT:-unset}" "1" "matching startup directory still exports PYENV_VIRTUALENV_INIT"
+assert_eq "${TEST_PYENV_VIRTUALENV_HOOK:-unset}" "triggered_from_virtualenv_hook" "matching startup directory still runs virtualenv hook"
+assert_false "matching startup directory does not leave precmd watcher behind" test "${precmd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
+assert_false "matching startup directory does not leave chpwd watcher behind" test "${chpwd_functions[(Ie)__zsh_pyenv_virtualenv_maybe_load]}" -gt 0
 
 builtin cd -- "$TEST_PYENV_SAVED_PWD"
 path=("${ORIGINAL_PATH[@]}")

@@ -26,6 +26,7 @@
 
 # 当然 具体 feature 可以按自己的需求覆盖 TTL
 typeset -gi ZSH_CACHE_DEFAULT_TTL="${ZSH_CACHE_DEFAULT_TTL:-86400}"
+typeset -gi ZSH_CACHE_MAX_KEY_LEN="${ZSH_CACHE_MAX_KEY_LEN:-120}"
 
 # --------------------------------------------------
 #  缓存文件目录
@@ -37,6 +38,27 @@ typeset -g ZSH_CACHE_SNIPPET_DIR="${ZSH_CACHE_SNIPPET_DIR:-$ZSH_CACHE_DIR/snippe
 
 # 确保缓存目录存在
 zsh_ensure_dir "$ZSH_CACHE_SNIPPET_DIR"
+
+# 优先启用 zsh 自带的时间戳变量.
+# 这样 cache 新鲜度判断可以少起一个外部 date 进程.
+zmodload -F zsh/datetime b:EPOCHSECONDS 2>/dev/null || true
+
+# --------------------------------------------------
+# zcache_now
+# --------------------------------------------------
+# 获取当前 Unix 时间戳.
+# 优先使用 zsh/datetime 暴露的 EPOCHSECONDS.
+# 只有模块不可用时才回退到外部 date.
+zcache_now() {
+  local now="${EPOCHSECONDS:-}"
+
+  if [[ "$now" != <-> ]]; then
+    now="$(date +%s 2>/dev/null)" || now=""
+  fi
+
+  [[ "$now" == <-> ]] || return 1
+  REPLY="$now"
+}
 
 # --------------------------------------------------
 # zcache_sanitize_key
@@ -79,6 +101,36 @@ zcache_sanitize_key() {
 }
 
 # --------------------------------------------------
+# zcache_compact_key
+# --------------------------------------------------
+# 对过长的安全 key 做二次压缩.
+# 这样既保留一部分可读前缀, 也避免长绝对路径直接打到文件名上限.
+zcache_compact_key() {
+  local safe_key="$1"
+  local max_len="${ZSH_CACHE_MAX_KEY_LEN:-120}"
+  local digest=''
+  local prefix=''
+  local suffix=''
+
+  [[ -n "$safe_key" ]] || safe_key="default"
+  [[ "$max_len" == <-> ]] || max_len=120
+  (( max_len > 32 )) || max_len=120
+
+  if (( ${#safe_key} <= max_len )); then
+    REPLY="$safe_key"
+    return 0
+  fi
+
+  digest="$(printf '%s' "$safe_key" | cksum 2>/dev/null)" || digest=""
+  digest="${digest%% *}"
+  [[ -n "$digest" ]] || digest="${#safe_key}"
+
+  prefix="${safe_key[1,40]}"
+  suffix="${safe_key[-16,-1]}"
+  REPLY="${prefix}_${digest}_${suffix}"
+}
+
+# --------------------------------------------------
 # zcache_path
 # --------------------------------------------------
 # 根据 cache_key 计算对应的缓存文件路径
@@ -96,6 +148,10 @@ zcache_path() {
 
   # 先把 key 规范化成安全文件名
   zcache_sanitize_key "$cache_key"
+  safe_key="$REPLY"
+
+  # 再把可能过长的 key 压缩到更稳妥的文件名长度.
+  zcache_compact_key "$safe_key"
   safe_key="$REPLY"
 
   # 拼接成最终缓存文件路径并通过 REPLY 返回
@@ -206,17 +262,13 @@ zcache_is_fresh() {
   fi
   mtime="$REPLY"
 
-  # 获取当前时间戳
-  if ! now="$(date +%s 2>/dev/null)"; then
+  # 获取当前时间戳.
+  # 命中 builtin 路径时可以减少启动阶段的外部进程数.
+  if ! zcache_now; then
     zsh_log_debug "zcache: fresh-check return=1 reason=clock-unavailable file=$file"
     return 1
   fi
-
-  # 拿不到纯数字时间戳 也保守地视为不新鲜
-  if [[ "$now" != <-> ]]; then
-    zsh_log_debug "zcache: fresh-check return=1 reason=clock-invalid now=$now file=$file"
-    return 1
-  fi
+  now="$REPLY"
 
   # 计算缓存年龄 当前时间 - 文件修改时间
   age=$(( now - mtime ))
