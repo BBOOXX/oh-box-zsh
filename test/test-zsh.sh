@@ -1,161 +1,14 @@
 #!/usr/bin/env bash
 set -u
 set -o pipefail
-# ^ 测试脚本故意不开 -e.
-#   原因是我们希望在某一步失败后, 继续跑完剩余检查, 最后一次性汇总失败项.
-#   如果开了 -e, 脚本会在第一处失败时立即退出, 不利于一次性看全量问题.
-
-PASS_COUNT=0
-FAIL_COUNT=0
-WARN_COUNT=0
-
-log() {
-# ^ 统一输出阶段标题.
-  printf '\n[%s] %s\n' "$1" "$2"
-}
-
-pass() {
-# ^ 成功计数并输出成功信息.
-  PASS_COUNT=$((PASS_COUNT + 1))
-  printf '[PASS] %s\n' "$*"
-}
-
-fail() {
-# ^ 失败计数并输出失败信息.
-  FAIL_COUNT=$((FAIL_COUNT + 1))
-  printf '[FAIL] %s\n' "$*"
-}
-
-warn() {
-# ^ 警告计数并输出警告信息.
-  WARN_COUNT=$((WARN_COUNT + 1))
-  printf '[WARN] %s\n' "$*"
-}
-
-run_capture() {
-# ^ 执行命令并同时捕获标准输出和标准错误.
-#   第一个参数是变量名, 用来接收输出内容.
-#   返回码保持为被执行命令的返回码.
-  local __var_name="$1"
-  shift
-
-  local __out
-  local __rc
-
-  __out="$("$@" 2>&1)"
-  __rc=$?
-
-  printf -v "$__var_name" '%s' "$__out"
-  return "$__rc"
-}
-
-assert_exists() {
-# ^ 判断路径是否存在, 包括坏掉的符号链接.
-  local path="$1"
-  local msg="$2"
-  if [ -e "$path" ] || [ -L "$path" ]; then
-    pass "$msg"
-  else
-    fail "$msg (missing: $path)"
-  fi
-}
-
-assert_not_exists() {
-# ^ 判断路径不存在, 包括不是坏掉的符号链接.
-  local path="$1"
-  local msg="$2"
-  if [ -e "$path" ] || [ -L "$path" ]; then
-    fail "$msg (unexpected path: $path)"
-  else
-    pass "$msg"
-  fi
-}
-
-assert_file() {
-# ^ 判断路径是否是普通文件.
-  local path="$1"
-  local msg="$2"
-  if [ -f "$path" ]; then
-    pass "$msg"
-  else
-    fail "$msg (not a regular file: $path)"
-  fi
-}
-
-assert_dir() {
-# ^ 判断路径是否是目录.
-  local path="$1"
-  local msg="$2"
-  if [ -d "$path" ]; then
-    pass "$msg"
-  else
-    fail "$msg (not a directory: $path)"
-  fi
-}
-
-assert_symlink() {
-# ^ 判断路径是否是符号链接.
-  local path="$1"
-  local msg="$2"
-  if [ -L "$path" ]; then
-    pass "$msg"
-  else
-    fail "$msg (not a symlink: $path)"
-  fi
-}
-
-assert_eq() {
-# ^ 做字符串相等断言.
-  local got="$1"
-  local expected="$2"
-  local msg="$3"
-  if [ "$got" = "$expected" ]; then
-    pass "$msg"
-  else
-    fail "$msg (got: $got | expected: $expected)"
-  fi
-}
-
-assert_contains() {
-# ^ 判断一段文本是否包含某个子串.
-  local haystack="$1"
-  local needle="$2"
-  local msg="$3"
-  if printf '%s\n' "$haystack" | grep -F -- "$needle" >/dev/null 2>&1; then
-    pass "$msg"
-  else
-    fail "$msg (missing: $needle)"
-  fi
-}
-
-assert_not_contains() {
-# ^ 判断一段文本不包含某个子串.
-  local haystack="$1"
-  local needle="$2"
-  local msg="$3"
-  if printf '%s\n' "$haystack" | grep -F -- "$needle" >/dev/null 2>&1; then
-    fail "$msg (unexpected: $needle)"
-  else
-    pass "$msg"
-  fi
-}
-
-print_block() {
-# ^ 打印一段输出块, 方便排查失败原因.
-  local title="$1"
-  local body="$2"
-  printf '\n----- %s -----\n%s\n' "$title" "$body"
-}
-
-get_symlink_target() {
-# ^ 读取符号链接目标.
-  local path="$1"
-  readlink "$path" 2>/dev/null || true
-}
+# 测试脚本故意不开 -e
+# 这样某一步失败后仍能继续跑完剩余检查, 最后一次性汇总失败项
 
 REPO_ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
-# ^ 计算仓库根目录.
-#   测试脚本位于 test/ 子目录, 所以上一层就是仓库根.
+# shellcheck source=./test/lib/assert.sh
+source "$REPO_ROOT/test/lib/assert.sh"
+
+# 测试脚本位于 test/ 子目录, 所以上一层就是仓库根
 
 BASH_BIN="$(command -v bash 2>/dev/null || true)"
 SHELLCHECK_BIN="$(command -v shellcheck 2>/dev/null || true)"
@@ -185,6 +38,7 @@ assert_file "$REPO_ROOT/zsh/features/z.zsh" "features/z.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/tmux.zsh" "features/tmux.zsh 存在"
 assert_dir  "$REPO_ROOT/zsh/features" "features 目录存在"
 assert_dir  "$REPO_ROOT/test" "test 目录存在"
+assert_file "$REPO_ROOT/test/lib/assert.sh" "test/lib/assert.sh 存在"
 assert_file "$REPO_ROOT/test/test-core.zsh" "test/test-core.zsh 存在"
 assert_file "$REPO_ROOT/test/test-install.sh" "test/test-install.sh 存在"
 
@@ -213,7 +67,7 @@ if [ -z "$SHELLCHECK_BIN" ]; then
   warn "shellcheck 未安装, 跳过 bash 静态检查"
 else
   printf 'shellcheck = %s\n' "$SHELLCHECK_BIN"
-  if run_capture SHELLCHECK_OUT "$SHELLCHECK_BIN" "$REPO_ROOT/install.sh" "$REPO_ROOT/test/test-zsh.sh" "$REPO_ROOT/test/test-install.sh"
+  if run_capture SHELLCHECK_OUT "$SHELLCHECK_BIN" -x "$REPO_ROOT/install.sh" "$REPO_ROOT/test/lib/assert.sh" "$REPO_ROOT/test/test-zsh.sh" "$REPO_ROOT/test/test-install.sh"
   then
     pass "shellcheck bash 脚本通过"
   else

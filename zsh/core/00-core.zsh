@@ -17,6 +17,72 @@
 #   zsh -lic 'exit'
 typeset -g ZSH_DEBUG="${ZSH_DEBUG:-0}"
 
+# 统一构造消息前缀
+# 后续如果要给提示, 警告, 调试日志统一加颜色, 只需要改这一条路径
+zsh_message_prefix() {
+  emulate -L zsh
+
+  local scope="${1:-zsh}"
+
+  REPLY="[${scope}]"
+}
+
+# 统一输出消息
+# - info 走 stdout, 适合提示和帮助
+# - warn / error / debug 走 stderr, 适合异常和调试
+zsh_msg() {
+  emulate -L zsh
+
+  local level="${1:-info}"
+  local scope="${2:-zsh}"
+  local old_reply="${REPLY-}"
+  local prefix
+  local use_stderr=0
+
+  shift 2 2>/dev/null || true
+
+  case "$level" in
+    info)
+      use_stderr=0
+      ;;
+    warn|error|debug)
+      use_stderr=1
+      ;;
+    *)
+      level="info"
+      use_stderr=0
+      ;;
+  esac
+
+  if [[ "$level" == "debug" ]]; then
+    scope="${scope}-debug"
+  fi
+
+  zsh_message_prefix "$scope"
+  prefix="$REPLY"
+  REPLY="$old_reply"
+
+  if (( use_stderr )); then
+    print -r -- "$prefix $*" >&2
+  else
+    print -r -- "$prefix $*"
+  fi
+}
+
+# 输出统一风格的提示信息
+zsh_info() {
+  zsh_msg info zsh "$@"
+}
+
+# 输出统一风格的警告信息
+zsh_warn() {
+  zsh_msg warn zsh "$@"
+}
+
+# 输出统一风格的错误信息
+zsh_error() {
+  zsh_msg error zsh "$@"
+}
 
 # 安全地 source 一个可选文件
 # 文件缺失不会报错
@@ -39,7 +105,7 @@ zsh_source_required() {
   [[ -n "$file" ]] || return 1
 
   if [[ ! -r "$file" ]]; then
-    print -r -- "[zsh] missing required file: $file" >&2
+    zsh_error "missing required file: $file"
     return 1
   fi
 
@@ -68,12 +134,7 @@ zsh_is_login() {
 # 在调试模式下输出调试日志
 zsh_log_debug() {
   [[ "${ZSH_DEBUG:-0}" == "1" ]] || return 0
-  print -r -- "[zsh-debug] $*" >&2
-}
-
-# 输出统一风格的警告信息
-zsh_warn() {
-  print -r -- "[zsh] $*" >&2
+  zsh_msg debug zsh "$@"
 }
 
 # 确保某个目录存在
@@ -84,6 +145,52 @@ zsh_ensure_dir() {
   [[ -d "$dir" ]] && return 0
 
   mkdir -p "$dir" 2>/dev/null
+}
+
+# 获取当前 Unix 时间戳
+# 优先使用 zsh/datetime 暴露的 EPOCHSECONDS
+# 只有模块不可用时才回退到外部 date
+zsh_now_seconds() {
+  emulate -L zsh
+
+  local now="${EPOCHSECONDS:-}"
+
+  if [[ "$now" != <-> ]]; then
+    zmodload -F zsh/datetime b:EPOCHSECONDS 2>/dev/null || true
+    now="${EPOCHSECONDS:-}"
+  fi
+
+  if [[ "$now" != <-> ]]; then
+    now="$(date +%s 2>/dev/null)" || now=""
+  fi
+
+  [[ "$now" == <-> ]] || return 1
+  REPLY="$now"
+}
+
+# 获取文件的 mtime Unix 时间戳
+# 优先尝试 GNU stat, 再回退到 BSD stat
+zsh_file_mtime() {
+  emulate -L zsh
+
+  local file="$1"
+  local mtime
+
+  [[ -r "$file" ]] || return 1
+
+  mtime="$(stat -c %Y "$file" 2>/dev/null)" || mtime=""
+  if [[ "$mtime" == <-> ]]; then
+    REPLY="$mtime"
+    return 0
+  fi
+
+  mtime="$(stat -f %m "$file" 2>/dev/null)" || mtime=""
+  if [[ "$mtime" == <-> ]]; then
+    REPLY="$mtime"
+    return 0
+  fi
+
+  return 1
 }
 
 # 校验 feature 名是否安全

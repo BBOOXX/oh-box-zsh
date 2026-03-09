@@ -79,7 +79,7 @@ __zlazy_run_loader() {
 
   # loader 名不能为空
   if [[ -z "$loader" ]]; then
-    print -r -- "[zlazy] missing loader name" >&2
+    zsh_msg warn zlazy "missing loader name"
     return 2
   fi
 
@@ -91,13 +91,13 @@ __zlazy_run_loader() {
   # 如果该 loader 当前正在执行 说明发生了递归触发
   # 这通常是配置设计问题 例如 loader 里又间接触发了同一个懒加载链
   if [[ -n "${__zlazy_loader_active[$loader]:-}" ]]; then
-    print -r -- "[zlazy] recursive loader invocation detected: $loader" >&2
+    zsh_msg warn zlazy "recursive loader invocation detected: $loader"
     return 1
   fi
 
   # 这里要求 loader 必须已经是一个已定义的 shell 函数
   if ! typeset -f "$loader" >/dev/null 2>&1; then
-    print -r -- "[zlazy] loader function not found: $loader" >&2
+    zsh_msg warn zlazy "loader function not found: $loader"
     return 127
   fi
 
@@ -116,7 +116,7 @@ __zlazy_run_loader() {
 
   # 如果 loader 返回非 0 则视为失败
   if (( rc != 0 )); then
-    print -r -- "[zlazy] loader failed: $loader (rc=$rc)" >&2
+    zsh_msg warn zlazy "loader failed: $loader (rc=$rc)"
     return "$rc"
   fi
 
@@ -150,7 +150,7 @@ __zlazy_dispatch() {
 
   # 如果找不到 loader 说明状态表异常或命令未注册
   if [[ -z "$loader" ]]; then
-    print -r -- "[zlazy] no loader registered for command: $cmd" >&2
+    zsh_msg warn zlazy "no loader registered for command: $cmd"
     return 127
   fi
 
@@ -209,7 +209,7 @@ zlazy_register() {
 
   # loader 名不能为空
   if [[ -z "$loader" ]]; then
-    print -r -- "[zlazy] usage: zlazy_register <loader_func> <cmd1> [cmd2 ...]" >&2
+    zsh_msg warn zlazy "usage: zlazy_register <loader_func> <cmd1> [cmd2 ...]"
     return 2
   fi
 
@@ -218,14 +218,14 @@ zlazy_register() {
 
   # 至少要有一个命令
   if (( $# == 0 )); then
-    print -r -- "[zlazy] no command specified for loader: $loader" >&2
+    zsh_msg warn zlazy "no command specified for loader: $loader"
     return 2
   fi
 
   # loader 必须已经存在 且必须是函数
   # 这是为了把错误尽量提前暴露 而不是等第一次命令调用时才发现
   if ! typeset -f "$loader" >/dev/null 2>&1; then
-    print -r -- "[zlazy] loader function not found at register time: $loader" >&2
+    zsh_msg warn zlazy "loader function not found at register time: $loader"
     return 2
   fi
 
@@ -233,7 +233,7 @@ zlazy_register() {
   for cmd in "$@"; do
     # 命令名必须合法
     if ! zlazy_is_valid_name "$cmd"; then
-      print -r -- "[zlazy] invalid lazy command name: $cmd" >&2
+      zsh_msg warn zlazy "invalid lazy command name: $cmd"
       return 2
     fi
 
@@ -242,7 +242,7 @@ zlazy_register() {
 
     # 为该命令创建包装器
     __zlazy_define_wrapper "$cmd" || {
-      print -r -- "[zlazy] failed to define wrapper for command: $cmd" >&2
+      zsh_msg warn zlazy "failed to define wrapper for command: $cmd"
       return 1
     }
 

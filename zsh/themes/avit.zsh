@@ -124,13 +124,8 @@ __zsh_avit_update_vi_mode_segment() {
 __zsh_avit_now_seconds() {
   emulate -L zsh
 
-  if (( ! ${+EPOCHSECONDS} )); then
-    zmodload zsh/datetime 2>/dev/null || true
-  fi
-
-  if (( ${+EPOCHSECONDS} )); then
-    REPLY="$EPOCHSECONDS"
-    return 0
+  if (( $+functions[zsh_now_seconds] )); then
+    zsh_now_seconds && return 0
   fi
 
   zsh_has_cmd date || return 1

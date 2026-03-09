@@ -96,7 +96,7 @@ case "$ZSH_INIT_STAGE" in
   *)
     # 非法阶段属于显式配置错误
     # 这里直接失败, 避免 shell 落入"bootstrap 已完成但 stage 未执行"的半初始化状态
-    print -r -- "[zsh-init] unknown stage: $ZSH_INIT_STAGE" >&2
+    zsh_msg error zsh-init "unknown stage: $ZSH_INIT_STAGE"
     return 1 2>/dev/null || exit 1
     ;;
 esac

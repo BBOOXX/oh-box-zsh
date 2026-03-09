@@ -156,12 +156,23 @@ DEBUG_OUT="$({ ZSH_DEBUG=1; zsh_log_debug "hello"; } 2>&1)"
 assert_contains "$DEBUG_OUT" "[zsh-debug] hello" "zsh_log_debug emits prefixed output"
 DEBUG_OFF_OUT="$({ ZSH_DEBUG=0; zsh_log_debug "hello"; } 2>&1)"
 assert_eq "$DEBUG_OFF_OUT" "" "zsh_log_debug stays quiet when disabled"
+INFO_OUT="$(zsh_msg info demo "heads up")"
+assert_eq "$INFO_OUT" "[demo] heads up" "zsh_msg emits scoped info on stdout"
 WARN_OUT="$({ zsh_warn "watch out"; } 2>&1)"
 assert_contains "$WARN_OUT" "[zsh] watch out" "zsh_warn emits prefixed output"
+ERROR_OUT="$({ zsh_msg error demo "broken"; } 2>&1)"
+assert_contains "$ERROR_OUT" "[demo] broken" "zsh_msg emits scoped errors on stderr"
 
 rm -rf "$TMPROOT/ensure-dir"
 assert_status 0 "zsh_ensure_dir creates missing directory" zsh_ensure_dir "$TMPROOT/ensure-dir"
 assert_true "zsh_ensure_dir result exists" test -d "$TMPROOT/ensure-dir"
+
+assert_status 0 "zsh_now_seconds returns current timestamp" zsh_now_seconds
+if [[ "$REPLY" == <-> ]]; then
+  pass "zsh_now_seconds returns numeric timestamp"
+else
+  fail "zsh_now_seconds returns numeric timestamp (got: $REPLY)"
+fi
 
 assert_true "zsh_feature_is_valid_name accepts env-path" zsh_feature_is_valid_name env-path
 assert_false "zsh_feature_is_valid_name rejects path traversal" zsh_feature_is_valid_name ../bad
@@ -295,6 +306,12 @@ assert_true "zcache_path compacts overlong cache filenames" test "${#LONG_CACHE_
 assert_contains "$LONG_CACHE_BASE" "pyenv-init_pyenv-init" "zcache_path keeps a readable prefix for long keys"
 
 print -r -- "cached" >| "$CACHE_FILE"
+assert_status 0 "zsh_file_mtime reads cache file mtime" zsh_file_mtime "$CACHE_FILE"
+if [[ "$REPLY" == <-> ]]; then
+  pass "zsh_file_mtime returns numeric timestamp"
+else
+  fail "zsh_file_mtime returns numeric timestamp (got: $REPLY)"
+fi
 assert_status 0 "zcache_get_mtime reads cache file mtime" zcache_get_mtime "$CACHE_FILE"
 if [[ "$REPLY" == <-> ]]; then
   pass "zcache_get_mtime returns numeric timestamp"

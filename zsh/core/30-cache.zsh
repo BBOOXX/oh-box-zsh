@@ -21,29 +21,17 @@
 typeset -gi ZSH_CACHE_DEFAULT_TTL="${ZSH_CACHE_DEFAULT_TTL:-86400}"
 typeset -gi ZSH_CACHE_MAX_KEY_LEN="${ZSH_CACHE_MAX_KEY_LEN:-120}"
 
-#  缓存文件目录
-# 这里单独定义一个shell 片段缓存目录放在 $ZSH_CACHE_DIR/snippets
+# 缓存文件目录
+# 这里单独定义一个 shell 片段缓存目录放在 $ZSH_CACHE_DIR/snippets
 typeset -g ZSH_CACHE_SNIPPET_DIR="${ZSH_CACHE_SNIPPET_DIR:-$ZSH_CACHE_DIR/snippets}"
 
 # 确保缓存目录存在
 zsh_ensure_dir "$ZSH_CACHE_SNIPPET_DIR"
 
-# 优先启用 zsh 自带的时间戳变量
-# 这样 cache 新鲜度判断可以少起一个外部 date 进程
-zmodload -F zsh/datetime b:EPOCHSECONDS 2>/dev/null || true
-
-# 获取当前 Unix 时间戳
-# 优先使用 zsh/datetime 暴露的 EPOCHSECONDS
-# 只有模块不可用时才回退到外部 date
+# 兼容旧调用点
+# 真实实现已经上移到 core, 这里保留函数名避免 feature 和测试同时抖动
 zcache_now() {
-  local now="${EPOCHSECONDS:-}"
-
-  if [[ "$now" != <-> ]]; then
-    now="$(date +%s 2>/dev/null)" || now=""
-  fi
-
-  [[ "$now" == <-> ]] || return 1
-  REPLY="$now"
+  zsh_now_seconds
 }
 
 # 把用户传入的 cache_key 规范化为适合做文件名的安全字符串
@@ -138,38 +126,7 @@ zcache_path() {
 # - 失败 返回 1
 
 zcache_get_mtime() {
-  # 取第一个参数作为文件路径
-  local file="$1"
-
-  # 用于存放最后读到的 mtime 值
-  local mtime
-
-  # 文件不可读 直接失败
-  [[ -r "$file" ]] || return 1
-
-  # 先尝试 GNU stat
-  #   stat -c %Y <file>
-  # 会输出文件的 mtime 秒级 Unix 时间戳
-  mtime="$(stat -c %Y "$file" 2>/dev/null)" || mtime=""
-
-  # 如果拿到了纯数字 就认为成功
-  if [[ "$mtime" == <-> ]]; then
-    REPLY="$mtime"
-    return 0
-  fi
-
-  # 如果 GNU stat 不可用 再尝试 BSD stat macOS 常见
-  #   stat -f %m <file>
-  mtime="$(stat -f %m "$file" 2>/dev/null)" || mtime=""
-
-  # 如果这里拿到了纯数字 也认为成功
-  if [[ "$mtime" == <-> ]]; then
-    REPLY="$mtime"
-    return 0
-  fi
-
-  # 两种方式都失败则返回失败
-  return 1
+  zsh_file_mtime "$1"
 }
 
 # 判断某个缓存文件是否仍然足够新鲜
@@ -310,7 +267,7 @@ zcache_ensure_cmd() {
 
   # 如果第一个参数为空 说明调用格式不对
   if [[ -z "$cache_key" ]]; then
-    print -r -- "[zcache] missing cache key" >&2
+    zsh_msg warn zcache "missing cache key"
     return 2
   fi
 
@@ -319,7 +276,7 @@ zcache_ensure_cmd() {
 
   # 如果后面已经没有参数了, 说明调用方至少漏掉了 --
   if (( $# == 0 )); then
-    print -r -- "[zcache] usage: zcache_ensure_cmd <cache_key> [ttl_seconds] -- <command...>" >&2
+    zsh_msg warn zcache "usage: zcache_ensure_cmd <cache_key> [ttl_seconds] -- <command...>"
     return 2
   fi
 
@@ -334,7 +291,7 @@ zcache_ensure_cmd() {
   # 现在下一个参数必须是分隔符 --
   # 这是为了明确区分 缓存参数 和 真正要执行的命令
   if (( $# == 0 )) || [[ "$1" != "--" ]]; then
-    print -r -- "[zcache] usage: zcache_ensure_cmd <cache_key> [ttl_seconds] -- <command...>" >&2
+    zsh_msg warn zcache "usage: zcache_ensure_cmd <cache_key> [ttl_seconds] -- <command...>"
     return 2
   fi
 
@@ -343,7 +300,7 @@ zcache_ensure_cmd() {
 
   # -- 后面必须至少还有一个命令参数
   if (( $# == 0 )); then
-    print -r -- "[zcache] missing command after --" >&2
+    zsh_msg warn zcache "missing command after --"
     return 2
   fi
 
@@ -386,7 +343,7 @@ zcache_ensure_cmd() {
     rm -f "$tmp_file" 2>/dev/null
 
     # 输出错误信息到 stderr
-    print -r -- "[zcache] command failed while rebuilding cache: $cache_key" >&2
+    zsh_msg warn zcache "command failed while rebuilding cache: $cache_key"
     zsh_log_debug "zcache: ensure return=$rc reason=command-failed key=$cache_key"
 
     # 把原始失败码返回给调用方 便于上层判断
@@ -405,7 +362,7 @@ zcache_ensure_cmd() {
     rm -f "$tmp_file" 2>/dev/null
 
     # 输出错误信息
-    print -r -- "[zcache] failed to move temp cache file into place: $cache_file" >&2
+    zsh_msg warn zcache "failed to move temp cache file into place: $cache_file"
     zsh_log_debug "zcache: ensure return=$rc reason=move-failed key=$cache_key file=$cache_file"
 
     # 返回 mv 的失败码
@@ -444,7 +401,7 @@ zcache_source_cmd() {
 
   # 再次做一个可读检查
   if [[ ! -r "$cache_file" ]]; then
-    print -r -- "[zcache] cache file is not readable: $cache_file" >&2
+    zsh_msg warn zcache "cache file is not readable: $cache_file"
     zsh_log_debug "zcache: source return=1 reason=unreadable file=$cache_file"
     return 1
   fi

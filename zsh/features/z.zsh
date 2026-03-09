@@ -24,23 +24,6 @@ typeset -gi __zsh_z_db_loaded="${__zsh_z_db_loaded:-0}"
 __zsh_z_scores=()
 __zsh_z_times=()
 
-zmodload -F zsh/datetime b:EPOCHSECONDS 2>/dev/null || true
-
-# 返回当前 Unix 时间戳
-# 优先使用 zsh/datetime, 退化时再用外部 date
-__zsh_z_now() {
-  emulate -L zsh
-
-  local now="${EPOCHSECONDS:-}"
-
-  if [[ "$now" != <-> ]]; then
-    now="$(date +%s 2>/dev/null)"
-  fi
-
-  [[ "$now" == <-> ]] || now=0
-  REPLY="$now"
-}
-
 # 校验路径文本是否适合进入索引
 # 这里只做字符串层面的格式限制, 避免在热路径里频繁做文件系统探测
 __zsh_z_is_valid_path_text() {
@@ -65,35 +48,6 @@ __zsh_z_should_track_path() {
   __zsh_z_is_valid_path_text "$dir" || return 1
   [[ -d "$dir" ]] || return 1
   return 0
-}
-
-# 读取数据文件的 mtime
-# 优先复用 core 层已有的 stat 逻辑, 这样 feature 自己不用重复分平台分支
-__zsh_z_file_mtime() {
-  emulate -L zsh
-
-  local file="$1"
-  local mtime
-
-  if (( $+functions[zcache_get_mtime] )); then
-    zcache_get_mtime "$file" && return 0
-  fi
-
-  [[ -r "$file" ]] || return 1
-
-  mtime="$(stat -c %Y "$file" 2>/dev/null)" || mtime=""
-  if [[ "$mtime" == <-> ]]; then
-    REPLY="$mtime"
-    return 0
-  fi
-
-  mtime="$(stat -f %m "$file" 2>/dev/null)" || mtime=""
-  if [[ "$mtime" == <-> ]]; then
-    REPLY="$mtime"
-    return 0
-  fi
-
-  return 1
 }
 
 # 清空内存态索引
@@ -137,7 +91,7 @@ __zsh_z_ensure_db_loaded() {
   local file="$ZSH_Z_DATA_FILE"
   local mtime=""
 
-  if __zsh_z_file_mtime "$file"; then
+  if zsh_file_mtime "$file"; then
     mtime="$REPLY"
   fi
 
@@ -181,7 +135,7 @@ __zsh_z_save_db() {
   }
 
   __zsh_z_db_loaded=1
-  if __zsh_z_file_mtime "$file"; then
+  if zsh_file_mtime "$file"; then
     __zsh_z_db_mtime="$REPLY"
   else
     __zsh_z_db_mtime=""
@@ -275,8 +229,11 @@ __zsh_z_touch_dir() {
   __zsh_z_should_track_path "$dir" || return 0
 
   __zsh_z_ensure_db_loaded
-  __zsh_z_now
-  now="$REPLY"
+  if zsh_now_seconds; then
+    now="$REPLY"
+  else
+    now=0
+  fi
   visits="${__zsh_z_scores[$dir]:-0}"
 
   __zsh_z_scores[$dir]="$(( visits + 1 ))"
@@ -410,7 +367,7 @@ __zsh_z_print_matches() {
   (( limit > 0 )) || limit=20
 
   if (( ! ${#records[@]} )); then
-    print -r -- "z: no tracked directories"
+    zsh_msg info z "no tracked directories"
     return 0
   fi
 
@@ -424,9 +381,9 @@ __zsh_z_print_matches() {
 
 # 输出 z 命令帮助.
 __zsh_z_print_help() {
-  print -r -- 'usage: z [-l] [keywords...]'
-  print -r -- '  z foo bar   jump to the best matching directory'
-  print -r -- '  z -l foo    list matching directories'
+  zsh_msg info z 'usage: z [-l] [keywords...]'
+  zsh_msg info z '  z foo bar   jump to the best matching directory'
+  zsh_msg info z '  z -l foo    list matching directories'
 }
 
 _z() {
@@ -504,7 +461,7 @@ z() {
         break
         ;;
       -*)
-        zsh_warn "z: unsupported option: $1"
+        zsh_msg warn z "unsupported option: $1"
         return 1
         ;;
       *)
@@ -529,7 +486,7 @@ z() {
   fi
 
   if (( ! ${#records[@]} )); then
-    zsh_warn "z: no match for: ${(j: :)queries}"
+    zsh_msg warn z "no match for: ${(j: :)queries}"
     return 1
   fi
 
@@ -547,7 +504,7 @@ z() {
     return $?
   done
 
-  zsh_warn "z: no usable match for: ${(j: :)queries}"
+  zsh_msg warn z "no usable match for: ${(j: :)queries}"
   return 1
 }
 
