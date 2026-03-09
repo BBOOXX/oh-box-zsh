@@ -310,6 +310,108 @@ SOURCE_CACHE_FILE="$REPLY"
 assert_status 0 "zcache_invalidate removes cache file" zcache_invalidate "unit-cache-source"
 assert_false "zcache_invalidate removes target from disk" test -e "$SOURCE_CACHE_FILE"
 
+log STEP "features/brew.zsh"
+
+HAD_ZSH_OS="${+ZSH_OS}"
+OLD_ZSH_OS="${ZSH_OS-}"
+HAD_ZSH_ARCH="${+ZSH_ARCH}"
+OLD_ZSH_ARCH="${ZSH_ARCH-}"
+typeset -ga TEST_BREW_SAVED_PATH=("${path[@]}")
+mkdir -p "$TMPROOT/no-brew-bin"
+path=("$TMPROOT/no-brew-bin")
+rehash
+ZSH_OS="unknown"
+ZSH_ARCH="unknown"
+source "$REPO_ROOT/zsh/features/brew.zsh" || exit 1
+path=("${TEST_BREW_SAVED_PATH[@]}")
+rehash
+
+ZSH_OS="macos"
+ZSH_ARCH="arm64"
+assert_status 0 "zsh_brew_default_bin supports macOS Apple Silicon" zsh_brew_default_bin
+assert_eq "$REPLY" "/opt/homebrew/bin/brew" "Apple Silicon 默认 brew 路径正确"
+
+ZSH_OS="macos"
+ZSH_ARCH="x86_64"
+assert_status 0 "zsh_brew_default_bin supports macOS Intel" zsh_brew_default_bin
+assert_eq "$REPLY" "/usr/local/bin/brew" "Intel macOS 默认 brew 路径正确"
+
+ZSH_OS="linux"
+ZSH_ARCH="x86_64"
+assert_status 0 "zsh_brew_default_bin supports Linux" zsh_brew_default_bin
+assert_eq "$REPLY" "/home/linuxbrew/.linuxbrew/bin/brew" "Linux 默认 brew 路径正确"
+
+ZSH_OS="unknown"
+ZSH_ARCH="unknown"
+assert_status 1 "zsh_brew_default_bin skips unsupported platform" zsh_brew_default_bin
+
+restore_var ZSH_OS "$HAD_ZSH_OS" "$OLD_ZSH_OS"
+restore_var ZSH_ARCH "$HAD_ZSH_ARCH" "$OLD_ZSH_ARCH"
+
+typeset -g ZSH_CACHE_DIR="$TMPROOT/brew-cache"
+typeset -g ZSH_CACHE_SNIPPET_DIR="$ZSH_CACHE_DIR/snippets"
+zsh_ensure_dir "$ZSH_CACHE_SNIPPET_DIR"
+
+typeset -g TEST_BREW_ROOT="$TMPROOT/fake-brew"
+typeset -g TEST_BREW_BIN="$TEST_BREW_ROOT/bin/brew"
+typeset -g TEST_BREW_COUNT_FILE="$TMPROOT/fake-brew.count"
+typeset -g TEST_BREW_PATH_FILE="$TMPROOT/fake-brew.path"
+mkdir -p "$TEST_BREW_ROOT/bin"
+
+{
+  print -r -- '#!/bin/sh'
+  print -r -- 'count=0'
+  print -r -- "[ -f \"$TEST_BREW_COUNT_FILE\" ] && count=\$(cat \"$TEST_BREW_COUNT_FILE\")"
+  print -r -- 'count=$((count + 1))'
+  print -r -- "printf '%s\n' \"\$count\" > \"$TEST_BREW_COUNT_FILE\""
+  print -r -- "printf '%s\n' \"\$PATH\" > \"$TEST_BREW_PATH_FILE\""
+  print -r -- 'if [ "$1" = "shellenv" ] && [ "$2" = "zsh" ]; then'
+  print -r -- "  case \":\$PATH:\" in"
+  print -r -- "    *\":$TEST_BREW_ROOT/bin:\"*) exit 0 ;;"
+  print -r -- '  esac'
+  print -r -- '  printf "%s\n" "typeset -gx TEST_BREW_ENV=loaded_from_fake_brew"'
+  print -r -- '  printf "%s\n" "typeset -gx TEST_BREW_LOAD_COUNT=${count}"'
+  print -r -- '  exit 0'
+  print -r -- 'fi'
+  print -r -- 'exit 1'
+} >| "$TEST_BREW_BIN"
+chmod +x "$TEST_BREW_BIN"
+
+typeset -g ZSH_BREW_SHELLENV_TTL=3600
+typeset -ga TEST_BREW_PATH_BEFORE=("${path[@]}")
+path=("$TEST_BREW_ROOT/bin" "${TEST_BREW_PATH_BEFORE[@]}")
+rehash
+unset TEST_BREW_ENV TEST_BREW_LOAD_COUNT
+
+assert_status 0 "zsh_brew_init sources cached brew shellenv output" zsh_brew_init
+assert_eq "${TEST_BREW_ENV:-unset}" "loaded_from_fake_brew" "brew feature updates current shell from shellenv"
+assert_eq "${TEST_BREW_LOAD_COUNT:-unset}" "1" "brew feature sources first shellenv output"
+
+TEST_BREW_INVOKE_COUNT="$(<"$TEST_BREW_COUNT_FILE")"
+assert_eq "$TEST_BREW_INVOKE_COUNT" "1" "brew feature invokes brew once on cold cache"
+TEST_BREW_CALLED_PATH="$(<"$TEST_BREW_PATH_FILE")"
+if [[ "$TEST_BREW_CALLED_PATH" == *"$TEST_BREW_ROOT/bin"* ]]; then
+  fail "brew feature should call brew shellenv with sanitized PATH"
+else
+  pass "brew feature calls brew shellenv with sanitized PATH"
+fi
+
+zsh_brew_cache_key "$TEST_BREW_BIN"
+zcache_path "$REPLY"
+TEST_BREW_CACHE_FILE="$REPLY"
+assert_file_readable "$TEST_BREW_CACHE_FILE" "brew feature creates readable shellenv cache"
+
+unset TEST_BREW_ENV TEST_BREW_LOAD_COUNT
+assert_status 0 "zsh_brew_init reuses fresh cache" zsh_brew_init
+assert_eq "${TEST_BREW_ENV:-unset}" "loaded_from_fake_brew" "brew feature can re-source cached shellenv"
+assert_eq "${TEST_BREW_LOAD_COUNT:-unset}" "1" "cached shellenv keeps original content"
+TEST_BREW_INVOKE_COUNT="$(<"$TEST_BREW_COUNT_FILE")"
+assert_eq "$TEST_BREW_INVOKE_COUNT" "1" "brew feature avoids re-running brew while cache is fresh"
+
+path=("${ORIGINAL_PATH[@]}")
+rehash
+unset ZSH_BREW_SHELLENV_TTL TEST_BREW_ENV TEST_BREW_LOAD_COUNT
+
 log STEP "40-lazy.zsh"
 
 __zlazy_loader_by_cmd=()

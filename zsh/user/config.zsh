@@ -19,6 +19,7 @@
 # login 只做轻量 PATH 基础层
 typeset -ga ZSH_LOGIN_FEATURES
 ZSH_LOGIN_FEATURES=(
+  brew
   env-path
 )
 
