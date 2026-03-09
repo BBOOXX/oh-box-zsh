@@ -47,6 +47,9 @@ fi
 
 if (( ${ZSH_IS_MACOS:-0} )); then
   alias ls='ls -Gp -D "%F %T" '
+  alias l='ls -lah'
+  alias la='ls -lAh'
+  alias ll='ls -lh'
   alias yoink='open -a Yoink'
   alias tree='tree -N '
   alias ytd='yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --output "[%(id)s].%(ext)s" --cookies-from-browser chrome '
