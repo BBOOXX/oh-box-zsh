@@ -1,6 +1,6 @@
 # themes/avit.zsh
 # OMZ avit 的本地移植版.
-#
+
 # 迁移原则.
 # 1. 主题文件只负责 prompt, 不顺带改 ls 或 grep 配色.
 # 2. 不依赖 OMZ 的 prompt helper, 在仓库内自包含.
@@ -147,6 +147,30 @@ __zsh_avit_build_commit_age_segment() {
 }
 
 # --------------------------------------------------
+# __zsh_avit_normalize_branch_name
+# --------------------------------------------------
+# 把 git status --branch 的原始分支描述收敛成 prompt 可读形式.
+__zsh_avit_normalize_branch_name() {
+  emulate -L zsh
+
+  local branch_name="$1"
+
+  if [[ "$branch_name" == "HEAD (detached at "* && "$branch_name" == *')' ]]; then
+    branch_name="${branch_name#HEAD (detached at }"
+    branch_name="${branch_name%)}"
+  elif [[ "$branch_name" == "HEAD (detached from "* && "$branch_name" == *')' ]]; then
+    branch_name="${branch_name#HEAD (detached from }"
+    branch_name="${branch_name%)}"
+  elif [[ "$branch_name" == 'HEAD (no branch)' ]]; then
+    branch_name='detached'
+  elif [[ "$branch_name" == "No commits yet on "* ]]; then
+    branch_name="${branch_name#No commits yet on }"
+  fi
+
+  REPLY="$branch_name"
+}
+
+# --------------------------------------------------
 # __zsh_avit_build_git_segments
 # --------------------------------------------------
 # 用一次 git status 生成左侧分支状态和右侧工作区摘要.
@@ -172,23 +196,8 @@ __zsh_avit_build_git_segments() {
   if [[ "$header" == '## '* ]]; then
     branch="${header#\#\# }"
     branch="${branch%%...*}"
-
-    case "$branch" in
-      'HEAD (detached at '*')')
-        branch="${branch#HEAD (detached at }"
-        branch="${branch%)}"
-        ;;
-      'HEAD (detached from '*')')
-        branch="${branch#HEAD (detached from }"
-        branch="${branch%)}"
-        ;;
-      'HEAD (no branch)')
-        branch='detached'
-        ;;
-      'No commits yet on '*)
-        branch="${branch#No commits yet on }"
-        ;;
-    esac
+    __zsh_avit_normalize_branch_name "$branch"
+    branch="$REPLY"
   fi
 
   [[ -n "$branch" ]] || branch='git'
@@ -317,8 +326,8 @@ fi
 
 __zsh_avit_precmd
 
-PROMPT='${__zsh_avit_user_host_segment}${__zsh_avit_dir_segment}${__zsh_avit_git_left_segment}${__zsh_avit_virtualenv_segment}${__zsh_avit_vi_mode_segment}
-%(!.%F{red}.%F{white})▶%f '
+# 用相邻字符串保留原始 prompt 语义, 同时避免多行单引号破坏编辑器高亮.
+PROMPT='${__zsh_avit_user_host_segment}${__zsh_avit_dir_segment}${__zsh_avit_git_left_segment}${__zsh_avit_virtualenv_segment}${__zsh_avit_vi_mode_segment}'$'\n''%(!.%F{red}.%F{white})▶%f '
 
 PROMPT2='%(!.%F{red}.%F{white})◀%f '
 
