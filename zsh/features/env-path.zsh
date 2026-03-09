@@ -14,6 +14,7 @@
 
 # 用户级常见目录优先
 path_prepend "$HOME/.local/bin"
+path_prepend "$HOME/.local/sbin"
 path_prepend "$HOME/bin"
 
 # 通用系统级本地目录放在后面兜底
