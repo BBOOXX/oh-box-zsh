@@ -29,6 +29,20 @@ zsh_autosuggestions_candidate_from_brew() {
 }
 
 # --------------------------------------------------
+# zsh_autosuggestions_candidate_from_prefix
+# --------------------------------------------------
+# 根据 Homebrew 前缀推导插件脚本路径
+zsh_autosuggestions_candidate_from_prefix() {
+  emulate -L zsh
+
+  local prefix="$1"
+
+  [[ -n "$prefix" ]] || return 1
+
+  REPLY="$prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+}
+
+# --------------------------------------------------
 # zsh_autosuggestions_default_file
 # --------------------------------------------------
 # 根据当前平台返回 Homebrew 默认前缀下的插件脚本路径
@@ -62,12 +76,14 @@ zsh_autosuggestions_default_file() {
 # --------------------------------------------------
 # 按优先级定位插件脚本
 # 1. 用户显式覆盖的文件路径
-# 2. 当前 PATH 里的 brew 所在前缀
-# 3. 平台默认 Homebrew 前缀
+# 2. 已初始化好的 HOMEBREW_PREFIX
+# 3. 当前 PATH 里的 brew 所在前缀
+# 4. 平台默认 Homebrew 前缀
 zsh_autosuggestions_find_file() {
   emulate -L zsh
 
   local file="${ZSH_AUTOSUGGESTIONS_FILE:-}"
+  local prefix="${HOMEBREW_PREFIX:-}"
 
   if [[ -n "$file" ]]; then
     if [[ -r "$file" ]]; then
@@ -78,6 +94,19 @@ zsh_autosuggestions_find_file() {
 
     zsh_log_debug "autosuggestions: find-file return=1 reason=override-not-readable file=$file"
     return 1
+  fi
+
+  if [[ -n "$prefix" ]]; then
+    zsh_autosuggestions_candidate_from_prefix "$prefix"
+    file="$REPLY"
+
+    if [[ -r "$file" ]]; then
+      REPLY="$file"
+      zsh_log_debug "autosuggestions: find-file return=0 source=homebrew-prefix file=$REPLY"
+      return 0
+    fi
+
+    zsh_log_debug "autosuggestions: find-file miss source=homebrew-prefix file=$file"
   fi
 
   if (( $+commands[brew] )); then
@@ -108,35 +137,23 @@ zsh_autosuggestions_find_file() {
   zsh_log_debug "autosuggestions: find-file return=0 source=default file=$REPLY"
 }
 
-# --------------------------------------------------
-# zsh_autosuggestions_init
-# --------------------------------------------------
-# 如果脚本存在, 就把它加载进当前 interactive shell
-zsh_autosuggestions_init() {
-  emulate -L zsh
-
-  local file
-  local rc
-
-  zsh_log_debug "autosuggestions: init start"
-
-  if ! zsh_autosuggestions_find_file; then
-    zsh_log_debug "autosuggestions: init return=0 reason=file-not-found"
-    return 0
-  fi
-  file="$REPLY"
-
-  source "$file"
-  rc=$?
-  zsh_log_debug "autosuggestions: init return=$rc file=$file"
-  return "$rc"
-}
-
-zsh_autosuggestions_init
+zsh_log_debug "autosuggestions: init start"
 
 export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=240'
 export ZSH_AUTOSUGGEST_USE_ASYNC=1
-bindkey '^f' autosuggest-accept
-bindkey '^h' forward-word
-# see https://is.gd/4S8lZn
 ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste accept-line)
+
+if zsh_autosuggestions_find_file; then
+  source "$REPLY"
+  typeset -gi __zsh_autosuggestions_source_rc="$?"
+
+  if (( __zsh_autosuggestions_source_rc == 0 )); then
+    bindkey '^f' autosuggest-accept
+    bindkey '^h' forward-word
+  fi
+
+  zsh_log_debug "autosuggestions: init return=$__zsh_autosuggestions_source_rc file=$REPLY"
+  unset __zsh_autosuggestions_source_rc
+else
+  zsh_log_debug "autosuggestions: init return=0 reason=file-not-found"
+fi

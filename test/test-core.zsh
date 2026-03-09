@@ -432,14 +432,17 @@ typeset -g TEST_AUTOSUGGESTIONS_FILE="$TEST_AUTOSUGGESTIONS_ROOT/share/zsh-autos
 mkdir -p "${TEST_AUTOSUGGESTIONS_FILE:h}"
 
 {
-  print -r -- 'typeset -g TEST_AUTOSUGGESTIONS_MARK=loaded_from_autosuggestions'
+  print -r -- 'typeset TEST_AUTOSUGGESTIONS_MARK=loaded_from_autosuggestions'
 } >| "$TEST_AUTOSUGGESTIONS_FILE"
 
-unset TEST_AUTOSUGGESTIONS_MARK ZSH_AUTOSUGGESTIONS_FILE __zsh_feature_autosuggestions_loaded
+unset TEST_AUTOSUGGESTIONS_MARK ZSH_AUTOSUGGESTIONS_FILE HOMEBREW_PREFIX __zsh_feature_autosuggestions_loaded
 source "$REPO_ROOT/zsh/features/autosuggestions.zsh" || exit 1
 
 assert_status 0 "zsh_autosuggestions_candidate_from_brew derives plugin path from brew bin" zsh_autosuggestions_candidate_from_brew "$TEST_BREW_ROOT/bin/brew"
 assert_eq "$REPLY" "$TEST_BREW_ROOT/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "autosuggestions candidate path matches brew prefix"
+
+assert_status 0 "zsh_autosuggestions_candidate_from_prefix derives plugin path from prefix" zsh_autosuggestions_candidate_from_prefix "$TEST_AUTOSUGGESTIONS_ROOT"
+assert_eq "$REPLY" "$TEST_AUTOSUGGESTIONS_FILE" "autosuggestions candidate path matches explicit prefix"
 
 HAD_ZSH_OS="${+ZSH_OS}"
 OLD_ZSH_OS="${ZSH_OS-}"
@@ -474,9 +477,14 @@ assert_eq "$REPLY" "$TEST_AUTOSUGGESTIONS_FILE" "autosuggestions override file i
 
 unset TEST_AUTOSUGGESTIONS_MARK __zsh_feature_autosuggestions_loaded
 source "$REPO_ROOT/zsh/features/autosuggestions.zsh" || exit 1
-assert_eq "${TEST_AUTOSUGGESTIONS_MARK:-unset}" "loaded_from_autosuggestions" "autosuggestions feature sources override file into current shell"
+assert_eq "${TEST_AUTOSUGGESTIONS_MARK:-unset}" "loaded_from_autosuggestions" "autosuggestions feature sources override file at top level"
 
 unset ZSH_AUTOSUGGESTIONS_FILE
+HOMEBREW_PREFIX="$TEST_AUTOSUGGESTIONS_ROOT"
+assert_status 0 "zsh_autosuggestions_find_file prefers HOMEBREW_PREFIX when available" zsh_autosuggestions_find_file
+assert_eq "$REPLY" "$TEST_AUTOSUGGESTIONS_FILE" "autosuggestions feature prefers HOMEBREW_PREFIX path"
+
+unset HOMEBREW_PREFIX
 typeset -ga TEST_AUTOSUGGESTIONS_PATH_BEFORE=("${path[@]}")
 mkdir -p "$TEST_AUTOSUGGESTIONS_ROOT/bin"
 print -r -- '#!/bin/sh' >| "$TEST_AUTOSUGGESTIONS_ROOT/bin/brew"
