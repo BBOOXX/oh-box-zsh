@@ -231,6 +231,15 @@ EOF
   cat > "$TMPREPO/zsh/user/local.zsh" <<'EOF'
 # 这个临时 local 用于验证 interactive 末尾加载.
 typeset -g TEST_LOCAL_MARK="loaded_from_local"
+
+cd() {
+  if [[ "$#" -eq 1 && "$1" == "..." ]]; then
+    builtin cd ../..
+    return
+  fi
+
+  builtin cd "$@"
+}
 EOF
 
   cat > "$TMPREPO/zsh/features/test-login-probe.zsh" <<'EOF'
@@ -245,6 +254,8 @@ EOF
   RUNTIME_HOME="$TMPROOT/runtime-home"
   RUNTIME_XDG="$RUNTIME_HOME/.config"
   mkdir -p "$RUNTIME_HOME"
+  mkdir -p "$RUNTIME_HOME/tmp/a"
+  RUNTIME_CD_DOTS_EXPECT="$(cd "$RUNTIME_HOME/tmp/a" && pwd)"
 
   if run_capture RUNTIME_INSTALL_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$BASH_BIN" "$TMPREPO/install.sh" --link --force
   then
@@ -383,6 +394,16 @@ EOF
   else
     print_block "zsh -ic" "$INTERACTIVE_OUT"
     fail "zsh -ic 执行失败"
+  fi
+
+  # shellcheck disable=SC2016
+  if run_capture CD_DOTS_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -fc 'source "$HOME/.config/zsh/user/local.zsh"; mkdir -p "$HOME/tmp/a/b/c"; builtin cd "$HOME/tmp/a/b/c"; cd ...; print -r -- "cd_dots_pwd=$PWD"'
+  then
+    print_block "cd dots" "$CD_DOTS_OUT"
+    assert_contains "$CD_DOTS_OUT" "cd_dots_pwd=$RUNTIME_CD_DOTS_EXPECT" "local.zsh 可以把 cd ... 解析为上移两级"
+  else
+    print_block "cd dots" "$CD_DOTS_OUT"
+    fail "cd ... 行为验证失败"
   fi
 
   log STEP "stage 默认 feature 兜底验证"

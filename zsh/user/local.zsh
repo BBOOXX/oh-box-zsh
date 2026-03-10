@@ -25,6 +25,16 @@ if (( ${ZSH_IS_MACOS:-0} )); then
   alias ffprobe='ffprobe -hide_banner '
 fi
 
+# 只拦截最常见的 cd ... 用法, 其它参数保持 builtin cd 语义
+cd() {
+  if [[ "$#" -eq 1 && "$1" == "..." ]]; then
+    builtin cd ../..
+    return
+  fi
+
+  builtin cd "$@"
+}
+
 
 # SSH 会话需要把代理回指到客户端
 # 本地 shell 则直接走 127.0.0.1
