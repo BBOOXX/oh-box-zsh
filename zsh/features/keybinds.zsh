@@ -19,6 +19,10 @@ else
   bindkey -e
 fi
 
+# 保持和 oh-my-zsh 接近的单词边界
+# 这样 Ctrl-W 会按 . / - 等符号分段回删, 保留原来的交互手感
+WORDCHARS=''
+
 # 某些终端在 zle 激活时需要切到 application mode
 # 否则方向键, Home, End 等 terminfo 项可能表现不稳定
 # 这是一个比较常见但不显眼的兼容性补丁

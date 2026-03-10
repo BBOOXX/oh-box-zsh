@@ -769,6 +769,21 @@ path=("${TEST_TMUX_SAVED_PATH[@]}")
 rehash
 unfunction tmux 2>/dev/null || true
 
+log STEP "features/keybinds.zsh"
+
+HAD_ZSH_KEYMAP="${+ZSH_KEYMAP}"
+OLD_ZSH_KEYMAP="${ZSH_KEYMAP-}"
+HAD_WORDCHARS="${+WORDCHARS}"
+OLD_WORDCHARS="${WORDCHARS-}"
+
+typeset -g ZSH_KEYMAP="emacs"
+WORDCHARS='*?_-.[]~=/&;!#$%^(){}<>'
+source "$REPO_ROOT/zsh/features/keybinds.zsh" || exit 1
+assert_eq "$WORDCHARS" "" "keybinds feature restores oh-my-zsh style word boundaries"
+
+restore_var ZSH_KEYMAP "$HAD_ZSH_KEYMAP" "$OLD_ZSH_KEYMAP"
+restore_var WORDCHARS "$HAD_WORDCHARS" "$OLD_WORDCHARS"
+
 log STEP "features/autosuggestions.zsh"
 
 typeset -g TEST_AUTOSUGGESTIONS_ROOT="$TMPROOT/fake-autosuggestions"
