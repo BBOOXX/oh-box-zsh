@@ -3,6 +3,29 @@
 export PYTHONBREAKPOINT="pudb.set_trace"
 export COLORTERM="truecolor"
 
+alias ggpull='git pull'
+
+if (( ${ZSH_IS_LINUX:-0} )); then
+  alias ls='ls -p --color=tty --time-style="+%F %T"'
+  alias l='ls -lah'
+  alias la='ls -lAh'
+  alias ll='ls -lh'
+fi
+
+if (( ${ZSH_IS_MACOS:-0} )); then
+  alias ls='ls -Gp -D "%F %T" '
+  alias l='ls -lah'
+  alias la='ls -lAh'
+  alias ll='ls -lh'
+  alias yoink='open -a Yoink'
+  alias tree='tree -N '
+  alias ytd='yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --output "[%(id)s].%(ext)s" --cookies-from-browser chrome '
+  alias surge='/Applications/Surge.app/Contents/Applications/surge-cli'
+  alias ffmpeg='ffmpeg -hide_banner '
+  alias ffprobe='ffprobe -hide_banner '
+fi
+
+
 # SSH 会话需要把代理回指到客户端
 # 本地 shell 则直接走 127.0.0.1
 setproxy() {
@@ -34,27 +57,6 @@ unsetproxy() {
     unset https_proxy
     unset http_proxy
 }
-
-
-if (( ${ZSH_IS_LINUX:-0} )); then
-  alias ls='ls -p --color=tty --time-style="+%F %T"'
-  alias l='ls -lah'
-  alias la='ls -lAh'
-  alias ll='ls -lh'
-fi
-
-if (( ${ZSH_IS_MACOS:-0} )); then
-  alias ls='ls -Gp -D "%F %T" '
-  alias l='ls -lah'
-  alias la='ls -lAh'
-  alias ll='ls -lh'
-  alias yoink='open -a Yoink'
-  alias tree='tree -N '
-  alias ytd='yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --output "[%(id)s].%(ext)s" --cookies-from-browser chrome '
-  alias surge='/Applications/Surge.app/Contents/Applications/surge-cli'
-  alias ffmpeg='ffmpeg -hide_banner '
-  alias ffprobe='ffprobe -hide_banner '
-fi
 
 # 从 ~/.ssh/config 中抽取显式 Host, 让 ssh/scp 都能补全
 _zsh_local_complete_ssh_hosts() {
