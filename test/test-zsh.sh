@@ -397,6 +397,16 @@ EOF
   fi
 
   # shellcheck disable=SC2016
+  if run_capture GLOBAL_COMPINIT_GUARD_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'print -r -- "skip_global_compinit=${skip_global_compinit:-unset}"'
+  then
+    print_block "global compinit guard" "$GLOBAL_COMPINIT_GUARD_OUT"
+    assert_contains "$GLOBAL_COMPINIT_GUARD_OUT" 'skip_global_compinit=1' "zshenv 会在最早阶段声明 skip_global_compinit"
+  else
+    print_block "global compinit guard" "$GLOBAL_COMPINIT_GUARD_OUT"
+    fail "global compinit guard 验证失败"
+  fi
+
+  # shellcheck disable=SC2016
   if run_capture CD_DOTS_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -fc 'source "$HOME/.config/zsh/user/local.zsh"; mkdir -p "$HOME/tmp/a/b/c"; builtin cd "$HOME/tmp/a/b/c"; cd ...; print -r -- "cd_dots_pwd=$PWD"'
   then
     print_block "cd dots" "$CD_DOTS_OUT"

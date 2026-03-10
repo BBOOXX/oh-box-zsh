@@ -46,6 +46,7 @@
 ```text
 ~/.zshenv
   -> ZDOTDIR
+  -> skip_global_compinit guard
   -> zsh/.zprofile or zsh/.zshrc
   -> zsh/init.zsh
   -> zsh/core/*
@@ -59,3 +60,6 @@ interactive 阶段:
 
 默认值不再集中在单个 `defaults.zsh`.
 模块参数由各自 `feature` 或 `theme` 用本地 fallback 处理, 阶段 feature 列表由 `stage/*.zsh` 负责兜底.
+
+在 Debian/Ubuntu 一类带全局 `/etc/zsh/zshrc` 的环境里, `~/.zshenv` 还会提前声明 `skip_global_compinit=1`.
+这样系统默认 `compinit` 不会先把 `.zcompdump` 写到 `$ZDOTDIR`, completion feature 只使用项目约定的 XDG cache 路径.
