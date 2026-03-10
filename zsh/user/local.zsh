@@ -95,3 +95,7 @@ _zsh_local_complete_ssh_hosts() {
 }
 
 zstyle -e ':completion:*:*:*:hosts' hosts '_zsh_local_complete_ssh_hosts'
+
+# iTerm2 工具本身是独立脚本, 不依赖 shell integration hook
+# 这里仅在目录存在时把它加入 PATH, 避免 source 整份集成脚本
+path_prepend "$HOME/.iterm2"
