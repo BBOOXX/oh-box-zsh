@@ -379,7 +379,7 @@ EOF
     # 再做一组默认 UX 验证.
     # 这里只验证最关键的几个默认行为是否真的被打开.
     # shellcheck disable=SC2016
-    if run_capture UX_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'typeset -a matchers; zstyle -a ":completion:*" matcher-list matchers >/dev/null 2>&1; print -r -- "matchers=${(j:|:)matchers} opt_complete_in_word=${options[completeinword]:-off} opt_auto_menu=${options[automenu]:-off} opt_share_history=${options[sharehistory]:-off} opt_hist_verify=${options[histverify]:-off}"'
+    if run_capture UX_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'typeset -a matchers; zstyle -a ":completion:*" matcher-list matchers >/dev/null 2>&1; print -r -- "matchers=${(j:|:)matchers} opt_complete_in_word=${options[completeinword]:-off} opt_auto_menu=${options[automenu]:-off} opt_share_history=${options[sharehistory]:-off} opt_hist_verify=${options[histverify]:-off}"; bindkey -M emacs "^[[A"; bindkey -M emacs "^[[B"'
   then
     print_block "zsh default ux" "$UX_OUT"
     assert_contains "$UX_OUT" 'm:{[:lower:][:upper:]}={[:upper:][:lower:]}' "默认开启大小写无关补全 matcher"
@@ -387,6 +387,8 @@ EOF
     assert_contains "$UX_OUT" 'opt_auto_menu=on' "默认开启 auto_menu"
     assert_contains "$UX_OUT" 'opt_share_history=on' "默认开启 share_history"
     assert_contains "$UX_OUT" 'opt_hist_verify=on' "默认开启 hist_verify"
+    assert_contains "$UX_OUT" '"^[[A" zsh_keybinds_history_search_up' "默认把上箭头绑定到粘性前缀历史搜索"
+    assert_contains "$UX_OUT" '"^[[B" zsh_keybinds_history_search_down' "默认把下箭头绑定到粘性前缀历史搜索"
   else
     print_block "zsh default ux" "$UX_OUT"
     fail "默认 UX 验证失败"

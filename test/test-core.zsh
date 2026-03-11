@@ -781,6 +781,75 @@ WORDCHARS='*?_-.[]~=/&;!#$%^(){}<>'
 source "$REPO_ROOT/zsh/features/keybinds.zsh" || exit 1
 assert_eq "$WORDCHARS" "" "keybinds feature restores oh-my-zsh style word boundaries"
 
+fc -p "$TMPROOT/keybinds-history" 100 100
+print -sr -- "echo alpha"
+print -sr -- "echo beta"
+print -sr -- "echo alpha"
+print -sr -- "echo gamma"
+
+BUFFER=""
+CURSOR=${#BUFFER}
+LASTWIDGET="self-insert"
+assert_status 0 "keybinds empty buffer falls back to plain history" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo gamma" "空行上箭头先取最近一条历史"
+
+LASTWIDGET="_zsh_autosuggest_widget_modify"
+assert_status 0 "keybinds plain history can continue through autosuggestions wrappers" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo alpha" "空行连续上箭头会继续向前翻历史"
+
+assert_status 0 "keybinds plain history skips duplicate commands" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo beta" "普通历史会跳过已经出现过的重复命令"
+
+assert_status 0 "keybinds plain history stays on the oldest unique command" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo beta" "到达最旧唯一历史后继续上箭头不会跳走"
+
+assert_status 0 "keybinds plain history can move forward again" zsh_keybinds_history_search_down
+assert_eq "$BUFFER" "echo alpha" "空行下箭头会回到较新的唯一历史"
+
+assert_status 0 "keybinds plain history can move forward across unique results" zsh_keybinds_history_search_down
+assert_eq "$BUFFER" "echo gamma" "普通历史继续下箭头会回到更新的唯一历史"
+
+assert_status 0 "keybinds plain history restores the original empty buffer" zsh_keybinds_history_search_down
+assert_eq "$BUFFER" "" "继续下箭头会回到最初的空输入"
+
+assert_status 0 "keybinds plain history stays on the original empty buffer" zsh_keybinds_history_search_down
+assert_eq "$BUFFER" "" "回到原始输入后继续下箭头不会跳走"
+
+BUFFER="echo "
+CURSOR=${#BUFFER}
+LASTWIDGET="self-insert"
+assert_status 0 "keybinds prefix search finds the latest matching history entry" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo gamma" "第一次上箭头会命中最近的前缀匹配"
+
+LASTWIDGET="_zsh_autosuggest_widget_modify"
+assert_status 0 "keybinds prefix search can continue through autosuggestions wrappers" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo alpha" "第二次上箭头会继续向前命中更早的前缀匹配"
+
+assert_status 0 "keybinds prefix search skips duplicate commands" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo beta" "前缀搜索也会跳过已经出现过的重复命令"
+
+assert_status 0 "keybinds prefix search stays on the oldest unique match" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo beta" "到达最旧唯一前缀匹配后继续上箭头不会跳走"
+
+assert_status 0 "keybinds prefix search can move forward again" zsh_keybinds_history_search_down
+assert_eq "$BUFFER" "echo alpha" "第一次下箭头会回到较新的唯一前缀匹配"
+
+assert_status 0 "keybinds prefix search can move forward across unique results" zsh_keybinds_history_search_down
+assert_eq "$BUFFER" "echo gamma" "前缀搜索继续下箭头会回到更新的唯一前缀匹配"
+
+assert_status 0 "keybinds prefix search restores the original query buffer" zsh_keybinds_history_search_down
+assert_eq "$BUFFER" "echo " "继续下箭头会回到最初输入的前缀"
+
+assert_status 0 "keybinds prefix search stays on the original query buffer" zsh_keybinds_history_search_down
+assert_eq "$BUFFER" "echo " "回到原始前缀后继续下箭头不会跳走"
+
+BUFFER="echo beta --"
+CURSOR=${#BUFFER}
+LASTWIDGET="self-insert"
+assert_status 0 "editing a recalled line starts a new prefix search" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo beta --" "没有匹配时会保留用户修改后的当前行"
+fc -P
+
 restore_var ZSH_KEYMAP "$HAD_ZSH_KEYMAP" "$OLD_ZSH_KEYMAP"
 restore_var WORDCHARS "$HAD_WORDCHARS" "$OLD_WORDCHARS"
 
