@@ -815,6 +815,13 @@ assert_eq "$BUFFER" "" "继续下箭头会回到最初的空输入"
 assert_status 0 "keybinds plain history stays on the original empty buffer" zsh_keybinds_history_search_down
 assert_eq "$BUFFER" "" "回到原始输入后继续下箭头不会跳走"
 
+assert_status 0 "zle-line-finish resets sticky history state after accepting a line" zle-line-finish
+BUFFER=""
+CURSOR=${#BUFFER}
+LASTWIDGET="self-insert"
+assert_status 0 "after finishing a line empty buffer restarts from latest history" zsh_keybinds_history_search_up
+assert_eq "$BUFFER" "echo gamma" "回车结束当前行后, 新一轮上箭头会重新从最新历史开始"
+
 BUFFER="echo "
 CURSOR=${#BUFFER}
 LASTWIDGET="self-insert"

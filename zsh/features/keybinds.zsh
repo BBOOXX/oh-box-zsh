@@ -26,18 +26,24 @@ WORDCHARS=''
 # 某些终端在 zle 激活时需要切到 application mode
 # 否则方向键, Home, End 等 terminfo 项可能表现不稳定
 # 这是一个比较常见但不显眼的兼容性补丁
-if (( ${ZSH_KEYBINDS_APPLICATION_MODE:-1} )) && (( ${+terminfo[smkx]} )) && (( ${+terminfo[rmkx]} )); then
-  function zle-line-init() {
+function zle-line-init() {
+  if (( ${ZSH_KEYBINDS_APPLICATION_MODE:-1} )) && (( ${+terminfo[smkx]} )) && (( ${+terminfo[rmkx]} )); then
     echoti smkx
-  }
+  fi
+}
 
-  function zle-line-finish() {
+# 每次结束当前命令行编辑都要清掉方向键历史状态
+# 否则回车后下一次上箭头会错误地续接上一轮 sticky search
+function zle-line-finish() {
+  zsh_keybinds_reset_history_search
+
+  if (( ${ZSH_KEYBINDS_APPLICATION_MODE:-1} )) && (( ${+terminfo[smkx]} )) && (( ${+terminfo[rmkx]} )); then
     echoti rmkx
-  }
+  fi
+}
 
-  zle -N zle-line-init
-  zle -N zle-line-finish
-fi
+zle -N zle-line-init
+zle -N zle-line-finish
 
 # Ctrl-X Ctrl-E 在外部编辑器里编辑当前命令行
 autoload -Uz edit-command-line
