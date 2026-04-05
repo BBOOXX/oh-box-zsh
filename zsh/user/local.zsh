@@ -3,6 +3,9 @@
 export PYTHONBREAKPOINT="pudb.set_trace"
 export COLORTERM="truecolor"
 
+alias fuckpyc='find . -type f -name "*.py[co]" -delete'
+alias fuckpycache='find . -type d -name "__pycache__" -prune -exec rm -rf {} +'
+
 alias ggpull='git pull'
 
 if (( ${ZSH_IS_LINUX:-0} )); then
@@ -23,6 +26,9 @@ if (( ${ZSH_IS_MACOS:-0} )); then
   alias surge='/Applications/Surge.app/Contents/Applications/surge-cli'
   alias ffmpeg='ffmpeg -hide_banner '
   alias ffprobe='ffprobe -hide_banner '
+  alias fuckdot='dot_clean -mv .'
+  alias fucktrash='fd -HI "^\.Trash$" . -t d -x rm -rf'
+  alias fuckdsstore='fd -HI "^\.DS_Store$" . -t f -x rm -f'
 fi
 
 # 只拦截最常见的 cd ... 用法, 其它参数保持 builtin cd 语义
