@@ -886,21 +886,28 @@ OLD_ZSH_ARCH="${ZSH_ARCH-}"
 
 ZSH_OS="macos"
 ZSH_ARCH="arm64"
+assert_status 0 "zsh_autosuggestions_default_candidates supports macOS Apple Silicon" zsh_autosuggestions_default_candidates
+assert_eq "${(j.:.)reply}" "/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Apple Silicon autosuggestions 候选路径正确"
 assert_status 0 "zsh_autosuggestions_default_file supports macOS Apple Silicon" zsh_autosuggestions_default_file
 assert_eq "$REPLY" "/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Apple Silicon 默认 autosuggestions 路径正确"
 
 ZSH_OS="macos"
 ZSH_ARCH="x86_64"
+assert_status 0 "zsh_autosuggestions_default_candidates supports macOS Intel" zsh_autosuggestions_default_candidates
+assert_eq "${(j.:.)reply}" "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Intel autosuggestions 候选路径正确"
 assert_status 0 "zsh_autosuggestions_default_file supports macOS Intel" zsh_autosuggestions_default_file
 assert_eq "$REPLY" "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Intel macOS 默认 autosuggestions 路径正确"
 
 ZSH_OS="linux"
 ZSH_ARCH="x86_64"
+assert_status 0 "zsh_autosuggestions_default_candidates supports Linux" zsh_autosuggestions_default_candidates
+assert_eq "${(j.:.)reply}" "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh:/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh:/home/linuxbrew/.linuxbrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Linux autosuggestions 候选路径按优先级排列"
 assert_status 0 "zsh_autosuggestions_default_file supports Linux" zsh_autosuggestions_default_file
-assert_eq "$REPLY" "/home/linuxbrew/.linuxbrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Linux 默认 autosuggestions 路径正确"
+assert_eq "$REPLY" "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Linux 默认 autosuggestions 首选系统包路径"
 
 ZSH_OS="unknown"
 ZSH_ARCH="unknown"
+assert_status 1 "zsh_autosuggestions_default_candidates skips unsupported platform" zsh_autosuggestions_default_candidates
 assert_status 1 "zsh_autosuggestions_default_file skips unsupported platform" zsh_autosuggestions_default_file
 
 restore_var ZSH_OS "$HAD_ZSH_OS" "$OLD_ZSH_OS"
@@ -931,6 +938,36 @@ assert_eq "$REPLY" "$TEST_AUTOSUGGESTIONS_FILE" "autosuggestions feature prefers
 
 path=("${ORIGINAL_PATH[@]}")
 rehash
+
+typeset -g TEST_AUTOSUGGESTIONS_FALLBACK_FILE="$TMPROOT/fallback-autosuggestions.zsh"
+{
+  print -r -- 'typeset TEST_AUTOSUGGESTIONS_FALLBACK_MARK=loaded_from_default_candidates'
+} >| "$TEST_AUTOSUGGESTIONS_FALLBACK_FILE"
+
+zsh_autosuggestions_default_candidates() {
+  emulate -L zsh
+  reply=("$TMPROOT/missing-autosuggestions.zsh" "$TEST_AUTOSUGGESTIONS_FALLBACK_FILE")
+}
+
+typeset -ga TEST_AUTOSUGGESTIONS_PATH_NO_BREW=("${ORIGINAL_PATH[@]}")
+if (( $+commands[brew] )); then
+  path=("${TEST_AUTOSUGGESTIONS_PATH_NO_BREW[@]}")
+  path_remove "${commands[brew]:h}"
+  TEST_AUTOSUGGESTIONS_PATH_NO_BREW=("${path[@]}")
+fi
+
+path=("${TEST_AUTOSUGGESTIONS_PATH_NO_BREW[@]}")
+rehash
+
+unset HOMEBREW_PREFIX ZSH_AUTOSUGGESTIONS_FILE
+assert_status 0 "zsh_autosuggestions_find_file falls back across default candidates" zsh_autosuggestions_find_file
+assert_eq "$REPLY" "$TEST_AUTOSUGGESTIONS_FALLBACK_FILE" "autosuggestions feature skips unreadable default candidates"
+
+path=("${ORIGINAL_PATH[@]}")
+rehash
+
+unset __zsh_feature_autosuggestions_loaded
+source "$REPO_ROOT/zsh/features/autosuggestions.zsh" || exit 1
 
 log STEP "features/prompt and themes/avit.zsh"
 

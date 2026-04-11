@@ -36,29 +36,52 @@ zsh_autosuggestions_candidate_from_prefix() {
   REPLY="$prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 }
 
-# 根据当前平台返回 Homebrew 默认前缀下的插件脚本路径
-zsh_autosuggestions_default_file() {
+# 根据当前平台返回常见安装位置
+# Linux 这里同时覆盖系统包路径和 Homebrew 路径
+zsh_autosuggestions_default_candidates() {
   emulate -L zsh
 
-  local prefix
+  local -a candidates
 
   case "${ZSH_OS:-unknown}:${ZSH_ARCH:-unknown}" in
     macos:arm64)
-      prefix="/opt/homebrew"
+      candidates=("/opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh")
       ;;
     macos:*)
-      prefix="/usr/local"
+      candidates=("/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh")
       ;;
     linux:*)
-      prefix="/home/linuxbrew/.linuxbrew"
+      candidates=(
+        "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+        "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+        "/home/linuxbrew/.linuxbrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+      )
       ;;
     *)
-      zsh_log_debug "autosuggestions: default-file return=1 reason=unsupported-platform"
+      zsh_log_debug "autosuggestions: default-candidates return=1 reason=unsupported-platform"
       return 1
       ;;
   esac
 
-  REPLY="$prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  reply=("${candidates[@]}")
+  zsh_log_debug "autosuggestions: default-candidates return=0 files=${(j:,:)reply}"
+}
+
+# 兼容旧调用方, 返回当前平台的首个默认候选路径
+zsh_autosuggestions_default_file() {
+  emulate -L zsh
+
+  local -a candidates
+
+  if ! zsh_autosuggestions_default_candidates; then
+    zsh_log_debug "autosuggestions: default-file return=1 reason=no-default-candidates"
+    return 1
+  fi
+
+  candidates=("${reply[@]}")
+  (( ${#candidates[@]} )) || return 1
+
+  REPLY="${candidates[1]}"
   zsh_log_debug "autosuggestions: default-file return=0 file=$REPLY"
 }
 
@@ -72,6 +95,7 @@ zsh_autosuggestions_find_file() {
 
   local file="${ZSH_AUTOSUGGESTIONS_FILE:-}"
   local prefix="${HOMEBREW_PREFIX:-}"
+  local -a default_candidates
 
   if [[ -n "$file" ]]; then
     if [[ -r "$file" ]]; then
@@ -110,19 +134,24 @@ zsh_autosuggestions_find_file() {
     zsh_log_debug "autosuggestions: find-file miss source=brew-path file=$file"
   fi
 
-  if ! zsh_autosuggestions_default_file; then
-    zsh_log_debug "autosuggestions: find-file return=1 reason=no-default-file"
+  if ! zsh_autosuggestions_default_candidates; then
+    zsh_log_debug "autosuggestions: find-file return=1 reason=no-default-candidates"
     return 1
   fi
-  file="$REPLY"
+  default_candidates=("${reply[@]}")
 
-  if [[ ! -r "$file" ]]; then
-    zsh_log_debug "autosuggestions: find-file return=1 reason=not-readable file=$file"
-    return 1
-  fi
+  for file in "${default_candidates[@]}"; do
+    if [[ -r "$file" ]]; then
+      REPLY="$file"
+      zsh_log_debug "autosuggestions: find-file return=0 source=default file=$REPLY"
+      return 0
+    fi
 
-  REPLY="$file"
-  zsh_log_debug "autosuggestions: find-file return=0 source=default file=$REPLY"
+    zsh_log_debug "autosuggestions: find-file miss source=default file=$file"
+  done
+
+  zsh_log_debug "autosuggestions: find-file return=1 reason=default-candidates-unreadable"
+  return 1
 }
 
 zsh_log_debug "autosuggestions: init start"
