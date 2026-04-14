@@ -220,6 +220,46 @@ assert_eq "${(j.:.)path}" "$TMPROOT/bin-a:$TMPROOT/bin-b" "path_dedup removes du
 typeset -U path PATH
 path=("${ORIGINAL_PATH[@]}")
 
+log STEP "user/local.zsh"
+
+HAD_ZSH_IS_SSH="${+ZSH_IS_SSH}"
+OLD_ZSH_IS_SSH="${ZSH_IS_SSH-}"
+HAD_HTTPS_PROXY="${+HTTPS_PROXY}"
+OLD_HTTPS_PROXY="${HTTPS_PROXY-}"
+HAD_HTTP_PROXY="${+HTTP_PROXY}"
+OLD_HTTP_PROXY="${HTTP_PROXY-}"
+HAD_https_proxy="${+https_proxy}"
+OLD_https_proxy="${https_proxy-}"
+HAD_http_proxy="${+http_proxy}"
+OLD_http_proxy="${http_proxy-}"
+HAD_ALL_PROXY="${+ALL_PROXY}"
+OLD_ALL_PROXY="${ALL_PROXY-}"
+
+source "$REPO_ROOT/zsh/user/local.zsh" || exit 1
+
+ZSH_IS_SSH=0
+unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY
+setproxy
+assert_eq "${HTTPS_PROXY:-unset}" "http://127.0.0.1:6152" "setproxy 会设置大写 HTTPS 代理"
+assert_eq "${HTTP_PROXY:-unset}" "http://127.0.0.1:6152" "setproxy 会设置大写 HTTP 代理"
+assert_eq "${https_proxy:-unset}" "http://127.0.0.1:6152" "setproxy 会设置小写 HTTPS 代理"
+assert_eq "${http_proxy:-unset}" "http://127.0.0.1:6152" "setproxy 会设置小写 HTTP 代理"
+assert_eq "${ALL_PROXY:-unset}" "socks5://127.0.0.1:6153" "setproxy 会设置 ALL_PROXY"
+
+unsetproxy
+assert_eq "${HTTPS_PROXY-unset}" "unset" "unsetproxy 会清理大写 HTTPS 代理"
+assert_eq "${HTTP_PROXY-unset}" "unset" "unsetproxy 会清理大写 HTTP 代理"
+assert_eq "${https_proxy-unset}" "unset" "unsetproxy 会清理小写 HTTPS 代理"
+assert_eq "${http_proxy-unset}" "unset" "unsetproxy 会清理小写 HTTP 代理"
+assert_eq "${ALL_PROXY-unset}" "unset" "unsetproxy 会清理 ALL_PROXY"
+
+restore_var ZSH_IS_SSH "$HAD_ZSH_IS_SSH" "$OLD_ZSH_IS_SSH"
+restore_var HTTPS_PROXY "$HAD_HTTPS_PROXY" "$OLD_HTTPS_PROXY"
+restore_var HTTP_PROXY "$HAD_HTTP_PROXY" "$OLD_HTTP_PROXY"
+restore_var https_proxy "$HAD_https_proxy" "$OLD_https_proxy"
+restore_var http_proxy "$HAD_http_proxy" "$OLD_http_proxy"
+restore_var ALL_PROXY "$HAD_ALL_PROXY" "$OLD_ALL_PROXY"
+
 log STEP "20-detect.zsh"
 
 case "$(uname -s 2>/dev/null)" in

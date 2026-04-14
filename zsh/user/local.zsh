@@ -69,9 +69,11 @@ setproxy() {
 }
 
 unsetproxy() {
-    unset ALL_PROXY
-    unset https_proxy
-    unset http_proxy
+  unset ALL_PROXY
+  unset HTTPS_PROXY
+  unset HTTP_PROXY
+  unset https_proxy
+  unset http_proxy
 }
 
 # 从 ~/.ssh/config 中抽取显式 Host, 让 ssh/scp 都能补全
