@@ -237,6 +237,9 @@ OLD_ALL_PROXY="${ALL_PROXY-}"
 
 source "$REPO_ROOT/zsh/user/local.zsh" || exit 1
 
+assert_eq "$(alias ggpull 2>/dev/null)" "ggpull='git pull'" "local.zsh 定义 ggpull 快捷别名"
+assert_eq "$(alias ggpush 2>/dev/null)" "ggpush='git push'" "local.zsh 定义 ggpush 快捷别名"
+
 ZSH_IS_SSH=0
 unset HTTPS_PROXY HTTP_PROXY https_proxy http_proxy ALL_PROXY
 setproxy

@@ -7,6 +7,7 @@ alias fuckpyc='find . -type f -name "*.py[co]" -delete'
 alias fuckpycache='find . -type d -name "__pycache__" -prune -exec rm -rf {} +'
 
 alias ggpull='git pull'
+alias ggpush='git push'
 
 if (( ${ZSH_IS_LINUX:-0} )); then
   alias ls='ls -p --color=tty --time-style="+%F %T"'
