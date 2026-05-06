@@ -1,11 +1,11 @@
 # features/pyenv.zsh
 # pyenv 初始化层
 
-# 这个 feature 只做 pyenv 自己的初始化
-# 1. 统一准备 PYENV_ROOT 和 root/bin
-# 2. 按阶段加载 pyenv init --path 或 pyenv init -
-# 3. 通过缓存压住 pyenv init 的外部命令成本
-# 4. 不混入 virtualenv 自动激活或自定义 alias
+# 初始化 pyenv
+# 1 统一准备 PYENV_ROOT 和 root/bin
+# 2 按阶段加载 pyenv init --path 或 pyenv init -
+# 3 通过缓存压住 pyenv init 的外部命令成本
+# 4 pyenv-virtualenv 只在 interactive 阶段按需懒加载
 
 # 计算当前 shell 应该使用的 PYENV_ROOT
 zsh_pyenv_root() {
@@ -16,7 +16,7 @@ zsh_pyenv_root() {
   REPLY="$pyenv_root"
 }
 
-# 提前导出 PYENV_ROOT, 并在需要时把 root/bin 放进 PATH
+# 提前导出 PYENV_ROOT 并在需要时把 root/bin 放进 PATH
 zsh_pyenv_prepare_env() {
   local pyenv_root=''
   local pyenv_bin_dir=''
@@ -45,7 +45,7 @@ zsh_pyenv_prepare_env() {
   fi
 }
 
-# 优先复用 PATH 里的 pyenv, 找不到再回退到 PYENV_ROOT/bin/pyenv
+# 优先复用 PATH 里的 pyenv 找不到再回退到 PYENV_ROOT/bin/pyenv
 zsh_pyenv_find_bin() {
   local pyenv_bin=''
 
@@ -86,8 +86,8 @@ zsh_pyenv_effective_rehash() {
   zsh_log_debug "pyenv: effective-rehash stage=$stage rehash=$REPLY"
 }
 
-# 把 stage, PYENV_ROOT 和 pyenv 可执行文件一起纳入缓存 key
-# 这样 root 变化, brew 升级或阶段切换时都不会误复用旧缓存
+# 把 stage PYENV_ROOT 和 pyenv 可执行文件一起纳入缓存 key
+# 避免 root 变化 brew 升级或阶段切换时误复用旧缓存
 zsh_pyenv_cache_key() {
   local pyenv_bin="$1"
   local stage="$2"
@@ -189,7 +189,7 @@ zsh_pyenv_load_init() {
     return "$rc"
   fi
 
-  # 这里直接 eval 的前提是 pyenv_bin 已经被明确解析为本机可执行文件.
+  # pyenv_bin 已明确解析为本机可执行文件后再 eval
   eval "$init_script"
   rc=$?
   zsh_log_debug "pyenv: load-init return=$rc stage=$stage pyenv=$pyenv_bin source=direct"
@@ -263,7 +263,7 @@ zsh_pyenv_load_virtualenv_init() {
     return "$rc"
   fi
 
-  # 这里直接 eval 的前提与 pyenv init 一样, 来源是本机可信 pyenv 可执行文件.
+  # pyenv virtualenv-init 来源是本机可信 pyenv 可执行文件
   eval "$init_script"
   rc=$?
   zsh_log_debug "pyenv: virtualenv load-init return=$rc pyenv=$pyenv_bin source=direct"
@@ -295,7 +295,7 @@ zsh_pyenv_find_trigger_file() {
   return 1
 }
 
-# 命中后或确认不可用后, 移除轻量 watcher
+# 命中后或确认不可用后 移除轻量 watcher
 zsh_pyenv_disable_virtualenv_lazy() {
   autoload -Uz add-zsh-hook
   add-zsh-hook -d precmd __zsh_pyenv_virtualenv_maybe_load 2>/dev/null || true
@@ -303,8 +303,8 @@ zsh_pyenv_disable_virtualenv_lazy() {
   unset __zsh_pyenv_virtualenv_lazy_registered
 }
 
-# 计算 pyenv-virtualenv hook 的挂载位置.
-# 默认走 chpwd, 避免每次空回车都触发 pyenv 检查.
+# 计算 pyenv-virtualenv hook 的挂载位置
+# 默认走 chpwd 避免每次空回车都触发 pyenv 检查
 zsh_pyenv_virtualenv_hook_mode() {
   local mode="${ZSH_PYENV_VIRTUALENV_HOOK_MODE:-chpwd}"
 
@@ -320,7 +320,7 @@ zsh_pyenv_virtualenv_hook_mode() {
 }
 
 # 统一接管 pyenv-virtualenv 的 hook 挂载点
-# 官方输出默认写进 precmd, 这里按项目策略改挂到 chpwd 或保留 precmd
+# 官方输出默认写进 precmd 项目策略可改挂到 chpwd 或保留 precmd
 zsh_pyenv_register_virtualenv_hook() {
   local mode=''
 
@@ -337,8 +337,8 @@ zsh_pyenv_register_virtualenv_hook() {
   zsh_log_debug "pyenv: virtualenv hook register mode=$mode"
 }
 
-# 判断当前 shell 是否真的已经载入 pyenv-virtualenv hook.
-# tmux 这类长生命周期进程可能只继承 PYENV_VIRTUALENV_INIT=1, 但 shell function 不会随环境变量继承.
+# 判断当前 shell 是否真的已经载入 pyenv-virtualenv hook
+# tmux 这类长生命周期进程可能只继承 PYENV_VIRTUALENV_INIT=1 但 shell function 无法随环境变量继承
 zsh_pyenv_has_virtualenv_hook() {
   [[ "${PYENV_VIRTUALENV_INIT:-0}" == "1" ]] || return 1
   (( $+functions[_pyenv_virtualenv_hook] ))
@@ -388,8 +388,8 @@ __zsh_pyenv_virtualenv_maybe_load() {
   return 0
 }
 
-# interactive 阶段只在当前目录检查一次, 然后注册 chpwd watcher.
-# 这样既能覆盖 shell 一开始就落在 Python 项目里的场景, 也避免每个 prompt 都重复扫父目录链.
+# interactive 阶段注册 chpwd watcher 并立即检查当前目录一次
+# 覆盖 shell 启动时已在 Python 项目里的场景
 zsh_pyenv_enable_virtualenv_lazy() {
   local pyenv_bin="$1"
 

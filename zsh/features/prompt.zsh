@@ -1,13 +1,13 @@
 # features/prompt.zsh
 # 提示符入口
 
-# 这个 feature 自己不定义具体主题内容
-# 它只负责
-# 1. 打开颜色支持
-# 2. 打开 prompt_subst
-# 3. 按主题名加载 themes/*.zsh
+# 加载主题 不定义主题内容
+# 职责
+# 1 打开颜色支持
+# 2 打开 prompt_subst
+# 3 按主题名加载 themes/*.zsh
 
-# 这样之后, 主题切换就变成纯配置动作, 不需要再改 feature 代码
+# 主题切换只改配置
 autoload -Uz colors
 colors
 

@@ -6,18 +6,18 @@
 # 后续各模块根据这些变量决定是否启用
 
 # 识别当前操作系统类型
-# - macos
-# - linux
-# - unknown
+# macos
+# linux
+# unknown
 zsh_detect_os() {
   local os_name
 
   # uname -s 通常返回系统内核名 例如
-  # - Darwin
-  # - Linux
-  # - FreeBSD
+  # Darwin
+  # Linux
+  # FreeBSD
 
-  # 2>/dev/null 是为了在极少数异常环境里抑制错误输出
+  # 抑制极少数异常环境里的错误输出
   os_name="$(uname -s 2>/dev/null)"
 
   case "$os_name" in
@@ -34,17 +34,17 @@ zsh_detect_os() {
 }
 
 # 识别 CPU 架构
-# - arm64
-# - x86_64
-# - 其他未知值则原样返回
+# arm64
+# x86_64
+# 其他未知值则原样返回
 zsh_detect_arch() {
   local arch_name
 
   # uname -m 通常返回机器架构名称 例如
-  # - arm64
-  # - aarch64
-  # - x86_64
-  # - amd64
+  # arm64
+  # aarch64
+  # x86_64
+  # amd64
   arch_name="$(uname -m 2>/dev/null)"
 
   case "$arch_name" in
@@ -63,25 +63,25 @@ zsh_detect_arch() {
 
 # 判断当前是否处于 Termux 环境
 # 返回值
-# - 是 Termux 0
-# - 不是1
+# 是 Termux 0
+# 非 Termux 1
 
 zsh_detect_termux() {
   # TERMUX_VERSION 是 Termux 常见环境变量之一
   [[ -n "${TERMUX_VERSION:-}" ]] && return 0
 
-  # PREFIX 是 shell 常见变量 但在 Termux 下通常是这个固定前缀
+  # Termux 下 PREFIX 通常为固定前缀
   [[ "${PREFIX:-}" == "/data/data/com.termux/files/usr" ]] && return 0
 
-  # HOME 在 Termux 下通常位于这个路径
+  # Termux 下 HOME 通常位于固定路径
   [[ "${HOME:-}" == "/data/data/com.termux/files/home" ]] && return 0
 
   return 1
 }
 
-# 判断当前是否处于 WSL (Windows Subsystem for Linux) 环境
-# - 是 WSL 0
-# - 不是 1
+# 判断当前是否处于 WSL Windows Subsystem for Linux 环境
+# 是 WSL 0
+# 非 WSL 1
 zsh_detect_wsl() {
   # WSL_INTEROP 在较新的 WSL 环境里很常见
   [[ -n "${WSL_INTEROP:-}" ]] && return 0
@@ -89,7 +89,7 @@ zsh_detect_wsl() {
   # WSL_DISTRO_NAME 也是常见特征变量
   [[ -n "${WSL_DISTRO_NAME:-}" ]] && return 0
 
-  # 只有在 Linux 且 /proc/version 可读时 才进一步检查
+  # /proc/version 可读时再检查内核版本文本
   if [[ -r /proc/version ]]; then
     # 直接把文件内容读进变量 避免额外起 grep 进程
     # 这在启动路径里更轻量
@@ -105,10 +105,10 @@ zsh_detect_wsl() {
   return 1
 }
 
-# 判断当前 shell 是否是通过 SSH 会话进入
+# 判断当前 shell 是否通过 SSH 会话进入
 # 返回值
-# - 是 SSH 0
-# - 不是 1
+# 是 SSH 0
+# 非 SSH 1
 zsh_detect_ssh() {
   [[ -n "${SSH_CONNECTION:-}" ]] && return 0
   [[ -n "${SSH_CLIENT:-}" ]] && return 0
@@ -117,16 +117,16 @@ zsh_detect_ssh() {
 }
 
 # 执行一次完整环境探测 并把结果写入全局变量
-# 这是给 init.zsh 调用的统一入口
+# init.zsh 调用入口
 # 输出变量
-# - ZSH_OS
-# - ZSH_ARCH
-# - ZSH_HOSTNAME
-# - ZSH_IS_TERMUX
-# - ZSH_IS_WSL
-# - ZSH_IS_SSH
-# - ZSH_IS_MACOS
-# - ZSH_IS_LINUX
+# ZSH_OS
+# ZSH_ARCH
+# ZSH_HOSTNAME
+# ZSH_IS_TERMUX
+# ZSH_IS_WSL
+# ZSH_IS_SSH
+# ZSH_IS_MACOS
+# ZSH_IS_LINUX
 zsh_detect_env() {
   # 探测 OS
   zsh_detect_os
@@ -139,14 +139,13 @@ zsh_detect_env() {
   # ^ 保存标准化后的架构字符串
 
   # 探测主机名
-  # %m 是 zsh 的提示符扩展语法 在这里通过参数展开取得短主机名
-  # 这种写法通常比外部调用 hostname 更轻量
+  # %m 是 zsh 提示符扩展语法 可取得短主机名
+  # 避免外部调用 hostname
   typeset -g ZSH_HOSTNAME="${HOST:-${(%):-%m}}"
 
-  # 初始化布尔标记
-  # 这里用整数 0/1 而不是字符串 true/false
-  # - 更适合 shell 的数值比较
-  # - 后续判断时可以用 [[ "$VAR" -eq 1 ]]
+  # 布尔标记使用整数 0/1
+  # 便于 shell 数值比较
+  # 后续判断可以用 [[ "$VAR" -eq 1 ]]
   typeset -gi ZSH_IS_TERMUX=0
   typeset -gi ZSH_IS_WSL=0
   typeset -gi ZSH_IS_SSH=0

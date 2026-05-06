@@ -1,36 +1,36 @@
 # 10-path.zsh
 # PATH 管理工具
 
-# 不再到处手写 export PATH="xxx:$PATH"
+# 集中处理 PATH 追加和导出
 # 统一通过函数增删 PATH
 # 自动去重 避免路径越堆越乱
 
 # 开启 path / PATH 自动唯一化
-# typeset -U 的含义是 唯一化unique
+# typeset -U 开启数组唯一化
 # 对数组变量加上 -U 之后
-# - 如果数组里出现重复元素 会自动去重
-# - 通常保留第一次出现的位置
+# 如果数组里出现重复元素 会自动去重
+# 通常保留第一次出现的位置
 
-# 这里同时对 path 和 PATH 做声明
-# - path 是数组
-# - PATH 是与之绑定的标量字符串
+# 同时声明 path 和 PATH
+# path 是数组
+# PATH 是与之绑定的标量字符串
 
-# 这样后面只要操作 path, PATH 会自动同步
+# 后续操作 path 时 PATH 自动同步
 typeset -gU path PATH
 
 # 判断某个目录是否已经在 path 数组里
 # 返回值
-# - 已存在 0
-# - 不存在 1
+# 已存在 0
+# 不存在 1
 path_contains() {
   local dir="$1"
   local item
 
-  # 空参数直接视为 不存在
+  # 空参数视为不存在
   [[ -n "$dir" ]] || return 1
 
   # 逐项遍历 path 数组做精确匹配
-  # 这里不用通配符匹配 避免路径里有特殊字符时产生误判
+  # 精确匹配可避免路径特殊字符造成误判
   for item in "${path[@]}"; do
     [[ "$item" == "$dir" ]] && return 0
   done
@@ -40,28 +40,28 @@ path_contains() {
 
 # 把目录加到 PATH 最前面
 # 典型场景
-# - 用户级 bin 优先于系统级 bin
-# - 项目私有工具优先于全局工具
+# 用户级 bin 优先于系统级 bin
+# 项目私有工具优先于全局工具
 path_prepend() {
   local dir="$1"
 
   # 参数为空 直接跳过
   [[ -n "$dir" ]] || return 0
 
-  # 不是目录就不加
-  # 这样可以避免把无效路径塞进 PATH
+  # 跳过非目录
+  # 避免把无效路径塞进 PATH
   [[ -d "$dir" ]] || return 0
 
   # 把目录放到数组最前面
-  # 因为 path/path 已启用 unique 若该目录本来已存在于后面
+  # path 和 PATH 已启用 unique 若该目录本来已存在于后面
   # zsh 会自动去重 最终保留最前面的这一个
   path=("$dir" "${path[@]}")
 }
 
 # 把目录加到 PATH 最后面
 # 典型场景
-# - 系统默认目录兜底
-# - 某些兼容性路径不希望抢优先级
+# 系统默认目录兜底
+# 某些兼容性路径不希望抢优先级
 path_append() {
   local dir="$1"
 
@@ -72,7 +72,7 @@ path_append() {
   [[ -d "$dir" ]] || return 0
 
   # 加到数组尾部
-  # 如果它已存在于前面 由于 unique 机制 前面的那个会被保留
+  # 已存在于前面时 unique 机制会保留前面的项
   path+=("$dir")
 }
 

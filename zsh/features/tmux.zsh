@@ -12,15 +12,15 @@ zsh_tmux_has_sessions() {
 }
 
 # 只在外层 shell 接管无参 tmux
-# 已经处在 tmux 内时保留原生命令语义, 避免误触发嵌套 attach/new
+# 已经处在 tmux 内时保留原生命令语义 避免误触发嵌套 attach/new
 zsh_tmux_should_auto_attach() {
   (( ${ZSH_TMUX_AUTO_ATTACH:-1} )) || return 1
   [[ -z "${TMUX:-}" ]]
 }
 
 # 统一处理 tmux 命令入口
-# - 无参数时: 有 session 则 attach, 否则 new-session
-# - 有参数时: 原样透传给真实 tmux
+# 无参数时 有 session 则 attach 否则 new-session
+# 有参数时 原样透传给真实 tmux
 zsh_tmux_entry() {
   if (( $# == 0 )) && zsh_tmux_should_auto_attach; then
     if zsh_tmux_has_sessions; then

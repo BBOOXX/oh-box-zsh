@@ -7,17 +7,17 @@ set -euo pipefail
 # pipefail 表示管道中任一环节失败都视为失败
 
 # 安装模式
-# 默认使用 link, 因为对 git 管理的配置仓库更友好
-# 另外也支持 copy, 适合不想让目标目录和仓库保持实时联动的场景
+# 默认使用 link 因为对 git 管理的配置仓库更友好
+# 另外也支持 copy 适合不想让目标目录和仓库保持实时联动的场景
 MODE="link"
 
 # 是否允许强制覆盖现有目标
 # 0 表示默认不强制
-# 1 表示如果目标已存在, 则先备份再替换
+# 1 表示如果目标已存在 则先备份再替换
 FORCE=0
 
 # 统一输出安装脚本消息
-# info 走 stdout, warn 走 stderr, 方便后续统一加颜色
+# info 走 stdout warn 走 stderr 方便后续统一加颜色
 install_msg() {
   local level="$1"
   shift
@@ -43,7 +43,7 @@ install_warn() {
 }
 
 # 备份已有目标
-# 如果路径存在, 就重命名为带时间戳的备份文件或备份目录
+# 如果路径存在 就重命名为带时间戳的备份文件或备份目录
 backup_path() {
   local target="$1"
   local ts
@@ -63,7 +63,7 @@ ensure_parent_dir() {
 }
 
 # 统一处理目标路径冲突
-# 已存在时在 --force 下先备份, 否则返回冲突错误
+# 已存在时在 --force 下先备份 否则返回冲突错误
 prepare_target_path() {
   local dst="$1"
 
@@ -90,8 +90,7 @@ same_symlink_target() {
 
 # 判断两个真实普通文件内容是否一致
 # 这用于 copy 模式下 ~/.zshenv 的幂等判定
-# 注意这里显式把符号链接排除在外
-# 否则从 link 模式切到 copy 模式时, 会被误判成已经同步, 结果保留下来的仍然是链接
+# 排除符号链接 防止 link 模式切到 copy 模式时误判已同步
 same_file_content() {
   local a="$1"
   local b="$2"
@@ -101,10 +100,9 @@ same_file_content() {
 }
 
 # 判断两个目录的内容是否一致
-# copy 模式如果只比较项目标识文件, 源目录更新后会误判成已经同步
-# 这里直接比较目录内容, 让重复安装在源码变更后也能正确刷新目标副本
-# 同时也要求目标必须是真实目录而不是符号链接
-# 这样从 link 模式切到 copy 模式时, --force 才会真正把链接替换成副本
+# 比较完整目录内容 防止源码变更后误判已同步
+# 目标必须是真实目录
+# --force 可把 link 模式留下的符号链接替换成副本
 same_dir_content() {
   local src="$1"
   local dst="$2"
@@ -202,24 +200,23 @@ main() {
   done
 
   # 计算仓库根目录的绝对路径
-  # 使用 BASH_SOURCE[0] 比单纯依赖 $0 更稳, 这样无论从哪里调用都能正确找到仓库根
+  # BASH_SOURCE[0] 可在不同调用位置稳定定位脚本
   project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
   # 仓库内的 zshenv 源文件
   src_zshenv="$project_dir/zshenv"
 
-  # 仓库内真正的 zsh 配置目录
-  # 注意仓库根不是 ZDOTDIR, zsh/ 才是
+  # ZDOTDIR 对应仓库内 zsh/ 目录
   src_zsh_dir="$project_dir/zsh"
 
-  # 安装目标 1. 用户家目录下的 ~/.zshenv
+  # 安装目标 1 用户家目录下的 ~/.zshenv
   dst_zshenv="$HOME/.zshenv"
 
   # 安装目标 2 的父目录
-  # 默认优先使用 XDG_CONFIG_HOME, 未设置时回落到 ~/.config
+  # 默认优先使用 XDG_CONFIG_HOME 未设置时回落到 ~/.config
   dst_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
 
-  # 安装目标 2. 真正的 ZDOTDIR
+  # 安装目标 2 真正的 ZDOTDIR
   dst_zsh_dir="$dst_config_dir/zsh"
 
   if [[ ! -f "$src_zshenv" ]]; then

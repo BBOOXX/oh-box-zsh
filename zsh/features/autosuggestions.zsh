@@ -1,9 +1,8 @@
 # features/autosuggestions.zsh
 # zsh-autosuggestions 启动器
 
-# 这个 feature 只负责找到并 source 官方脚本.
-# 它不负责安装插件, 也不在每次启动时执行 brew --prefix
-# 原因是 brew 本身是外部进程, 交互启动热路径里没必要重复付这笔成本
+# 定位并 source zsh-autosuggestions 脚本
+# 启动热路径只查文件 不运行 brew --prefix
 
 if [[ -n "${__zsh_feature_autosuggestions_loaded:-}" ]]; then
   return 0
@@ -37,7 +36,7 @@ zsh_autosuggestions_candidate_from_prefix() {
 }
 
 # 根据当前平台返回常见安装位置
-# Linux 这里同时覆盖系统包路径和 Homebrew 路径
+# Linux 覆盖发行版包 Alpine apk 本地安装和 Linuxbrew 路径
 zsh_autosuggestions_default_candidates() {
   emulate -L zsh
 
@@ -68,7 +67,7 @@ zsh_autosuggestions_default_candidates() {
   zsh_log_debug "autosuggestions: default-candidates return=0 files=${(j:,:)reply}"
 }
 
-# 兼容旧调用方, 返回当前平台的首个默认候选路径
+# 兼容旧调用方 返回当前平台的首个默认候选路径
 zsh_autosuggestions_default_file() {
   emulate -L zsh
 
@@ -87,10 +86,10 @@ zsh_autosuggestions_default_file() {
 }
 
 # 按优先级定位插件脚本
-# 1. 用户显式覆盖的文件路径
-# 2. 已初始化好的 HOMEBREW_PREFIX
-# 3. 当前 PATH 里的 brew 所在前缀
-# 4. 平台默认 Homebrew 前缀
+# 1 用户显式覆盖的文件路径
+# 2 已初始化好的 HOMEBREW_PREFIX
+# 3 当前 PATH 里的 brew 所在前缀
+# 4 平台默认 Homebrew 前缀
 zsh_autosuggestions_find_file() {
   emulate -L zsh
 

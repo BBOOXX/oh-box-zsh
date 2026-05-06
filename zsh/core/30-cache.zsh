@@ -5,41 +5,37 @@
 # 后续启动时优先复用缓存文件
 # 需要时再按 TTL 重建缓存
 
-# 它主要服务这类场景
-# - 某些工具的 shellenv 输出
-# - 其他会输出 shell 代码 且输出内容在短时间内相对稳定的命令
+# 适用场景
+# 某些工具的 shellenv 输出
+# 其他会输出 shell 代码 且输出内容在短时间内相对稳定的命令
 
 # ZSH_CACHE_DEFAULT_TTL 用来定义默认缓存有效期 单位是秒
-# 如果调用 zcache_source_cmd 时没有显式传 TTL 就会使用它
+# zcache_source_cmd 未显式传 TTL 时使用 ZSH_CACHE_DEFAULT_TTL
 
-# 默认值设为 86400 也就是 24 小时
-# 这个值是一个偏保守的工程默认值
-# - 不会每次都重跑外部命令
-# - 也不会无限期不刷新
-
-# 当然 具体 feature 可以按自己的需求覆盖 TTL
+# 默认 TTL 为 86400 秒
+# 平衡启动成本和缓存刷新
+# feature 可以按需求覆盖 TTL
 typeset -gi ZSH_CACHE_DEFAULT_TTL="${ZSH_CACHE_DEFAULT_TTL:-86400}"
 typeset -gi ZSH_CACHE_MAX_KEY_LEN="${ZSH_CACHE_MAX_KEY_LEN:-120}"
 
 # 缓存文件目录
-# 这里单独定义一个 shell 片段缓存目录放在 $ZSH_CACHE_DIR/snippets
+# shell 片段缓存放在 $ZSH_CACHE_DIR/snippets
 typeset -g ZSH_CACHE_SNIPPET_DIR="${ZSH_CACHE_SNIPPET_DIR:-$ZSH_CACHE_DIR/snippets}"
 
 # 确保缓存目录存在
 zsh_ensure_dir "$ZSH_CACHE_SNIPPET_DIR"
 
 # 兼容旧调用点
-# 真实实现已经上移到 core, 这里保留函数名避免 feature 和测试同时抖动
+# 保留旧函数名 兼容已有调用点
 zcache_now() {
   zsh_now_seconds
 }
 
 # 把用户传入的 cache_key 规范化为适合做文件名的安全字符串
-# cache_key 可能包含空格斜杠冒号等不适合作为文件名的字符
-# 例如
-# - "tool-shellenv"        -> "tool-shellenv"
-# - "tool/shellenv"        -> "tool_shellenv"
-# - "runtime init:zsh"     -> "runtime_init_zsh"
+# cache_key 可能包含无法稳定映射为文件名的字符
+# 示例 tool-shellenv 保持 tool-shellenv
+# 示例 tool/shellenv 变为 tool_shellenv
+# 示例 runtime init:zsh 变为 runtime_init_zsh
 zcache_sanitize_key() {
   # 取第一个参数作为原始 key
   local raw_key="$1"
@@ -47,20 +43,19 @@ zcache_sanitize_key() {
   # 定义本地变量 用来存放规范化后的 key
   local safe_key
 
-  # 如果调用方传了空 key 我们不让结果也为空
-  # 这样可以避免后面生成出奇怪的路径 例如只剩 .zsh
+  # 空 key 统一映射到 default
   if [[ -z "$raw_key" ]]; then
     REPLY="default"
     return 0
   fi
 
-  # 把所有不在白名单里的字符替换成下划线
+  # 把白名单外字符替换成下划线
   # 白名单保留
-  # - 英文字母
-  # - 数字
-  # - 点号 .
-  # - 下划线 _
-  # - 连字符 -
+  # 英文字母
+  # 数字
+  # 点号
+  # 下划线 _
+  # 连字符 -
   safe_key="${raw_key//[^[:alnum:]_.-]/_}"
 
   # 极端情况下如果替换后变成空字符串也给一个保底值
@@ -70,8 +65,8 @@ zcache_sanitize_key() {
   REPLY="$safe_key"
 }
 
-# 对过长的安全 key 做二次压缩.
-# 这样既保留一部分可读前缀, 也避免长绝对路径直接打到文件名上限
+# 对过长的安全 key 做二次压缩
+# 保留可读前缀并避免触碰文件名长度上限
 zcache_compact_key() {
   local safe_key="$1"
   local max_len="${ZSH_CACHE_MAX_KEY_LEN:-120}"
@@ -98,9 +93,8 @@ zcache_compact_key() {
 }
 
 # 根据 cache_key 计算对应的缓存文件路径
-# 例如
-# cache_key = "tool-shellenv"
-# 则可能得到
+# 示例 cache_key 为 tool-shellenv
+# 可能得到
 #   ~/.cache/zsh/snippets/tool-shellenv.zsh
 zcache_path() {
   # 取原始 key
@@ -113,7 +107,7 @@ zcache_path() {
   zcache_sanitize_key "$cache_key"
   safe_key="$REPLY"
 
-  # 再把可能过长的 key 压缩到更稳妥的文件名长度.
+  # 再把可能过长的 key 压缩到更稳妥的文件名长度
   zcache_compact_key "$safe_key"
   safe_key="$REPLY"
 
@@ -121,27 +115,26 @@ zcache_path() {
   REPLY="$ZSH_CACHE_SNIPPET_DIR/${safe_key}.zsh"
 }
 
-# 获取某个缓存文件的"最后修改时间Unix 时间戳"
-# - 成功 把 mtime 写入 REPLY 返回 0
-# - 失败 返回 1
+# 获取某个缓存文件的最后修改时间 Unix 时间戳
+# 成功 把 mtime 写入 REPLY 返回 0
+# 失败 返回 1
 
 zcache_get_mtime() {
   zsh_file_mtime "$1"
 }
 
 # 判断某个缓存文件是否仍然足够新鲜
-# - $1: 文件路径
-# - $2: TTL 秒 可省略 省略时使用默认 TTL
+# $1 文件路径
+# $2 TTL 秒 可省略 省略时使用默认 TTL
 # 返回值
-# - 新鲜 0
-# - 过期 / 不存在 / 无法判断 1
+# 新鲜 0
+# 过期 / 不存在 / 无法判断 1
 
-# 这里定义一个重要语义
-# - TTL > 0 按 当前时间 - mtime <= TTL 判断
-# - TTL = 0 只要文件存在,就视为永不过期
+# freshness 语义
+# TTL 大于 0 时按当前时间减 mtime 小于等于 TTL 判断
+# TTL 为 0 时只要文件存在就视为永不过期
 
-# TTL=0 的好处
-# 对某些极少变化的命令 例如某些 shellenv 输出 非常实用
+# TTL 为 0 适合极少变化的命令输出
 # 如果想强制刷新 直接删掉对应缓存文件即可
 zcache_is_fresh() {
   # 取文件路径
@@ -165,13 +158,13 @@ zcache_is_fresh() {
     return 1
   fi
 
-  # 如果 TTL 不是纯数字 回退到默认 TTL
+  # TTL 非纯数字时回退到默认 TTL
   if [[ "$ttl" != <-> ]]; then
     zsh_log_debug "zcache: fresh-check invalid-ttl ttl=$ttl fallback=$ZSH_CACHE_DEFAULT_TTL file=$file"
     ttl="$ZSH_CACHE_DEFAULT_TTL"
   fi
 
-  # TTL = 0 的特殊语义
+  # TTL 为 0 的特殊语义
   # 只要文件存在 就视为新鲜
   if (( ttl == 0 )); then
     zsh_log_debug "zcache: fresh-check return=0 reason=ttl-zero file=$file"
@@ -196,8 +189,8 @@ zcache_is_fresh() {
   # 计算缓存年龄 当前时间 - 文件修改时间
   age=$(( now - mtime ))
 
-  # 如果出现时钟回拨或奇怪时间 导致 age 为负
-  # 这里把它钳制到 0 避免比较逻辑异常
+  # 时钟回拨可能导致 age 为负
+  # 钳制到 0 避免比较逻辑异常
   if (( age < 0 )); then
     age=0
   fi
@@ -214,12 +207,12 @@ zcache_is_fresh() {
 
 # 主动删除某个 cache_key 对应的缓存文件
 # 典型场景
-# - 升级了 brew 希望立刻重建 shellenv 缓存
-# - 修改了某模块的初始化逻辑 想强制刷新
+# 升级了 brew 希望立刻重建 shellenv 缓存
+# 修改了某模块的初始化逻辑 想强制刷新
 
 # 返回值
-# - 删除成功或文件本来就不存在 0
-# - 删除失败 非 0
+# 删除成功或文件本来就不存在 0
+# 删除失败 非 0
 zcache_invalidate() {
   # 取 cache_key
   local cache_key="$1"
@@ -240,14 +233,14 @@ zcache_invalidate() {
 
 # 确保某个命令输出已经被缓存到文件中
 # 如果缓存不存在或已过期 就重新执行命令并重建缓存
-# 它本身不 source 只负责 确保缓存文件存在且可用
+# 只确保缓存文件存在且可用
 # 参数格式
 #   zcache_ensure_cmd <cache_key> [ttl_seconds] -- <command...>
 # 示例
 #   zcache_ensure_cmd "brew-shellenv" 86400 -- "$brew_bin" shellenv
 # 返回方式
-# - 成功 把缓存文件路径写入 REPLY 返回 0
-# - 失败 返回命令失败码或 2 参数错误
+# 成功 把缓存文件路径写入 REPLY 返回 0
+# 失败 返回命令失败码或 2 参数错误
 zcache_ensure_cmd() {
   # 第一个参数必须是 cache_key
   local cache_key="$1"
@@ -274,22 +267,22 @@ zcache_ensure_cmd() {
   # 把已消费的第一个参数移掉
   shift
 
-  # 如果后面已经没有参数了, 说明调用方至少漏掉了 --
+  # 如果后面已经没有参数了 说明调用方至少漏掉了 --
   if (( $# == 0 )); then
     zsh_msg warn zcache "usage: zcache_ensure_cmd <cache_key> [ttl_seconds] -- <command...>"
     return 2
   fi
 
   # 解析可选 TTL
-  # - 如果下一个参数不是 -- 就把它当作 TTL
-  # - 如果下一个参数是 -- 说明调用方省略了 TTL 直接用默认值
+  # 下一个参数非 -- 时当作 TTL
+  # 如果下一个参数是 -- 说明调用方省略了 TTL 直接用默认值
   if [[ "$1" != "--" ]]; then
     ttl="$1"
     shift
   fi
 
   # 现在下一个参数必须是分隔符 --
-  # 这是为了明确区分 缓存参数 和 真正要执行的命令
+  # 区分缓存参数和真正要执行的命令
   if (( $# == 0 )) || [[ "$1" != "--" ]]; then
     zsh_msg warn zcache "usage: zcache_ensure_cmd <cache_key> [ttl_seconds] -- <command...>"
     return 2
@@ -330,9 +323,9 @@ zcache_ensure_cmd() {
   zsh_log_debug "refresh cache: key=$cache_key ttl=$ttl file=$cache_file"
 
   # 执行真正的命令 把标准输出写入临时文件
-  # 这里用 `>|` 而不是 `>` 目的是即使用户开了 noclobber
+  # >| 明确覆盖 noclobber
   # 也允许我们明确覆盖临时文件
-  # 这个命令的输出 预期应该是 可被 source 的 shell 代码
+  # 命令输出必须是可 source 的 shell 代码
   if "$@" >| "$tmp_file"; then
     zsh_log_debug "zcache: ensure command-ok key=$cache_key tmp=$tmp_file"
     :
@@ -351,7 +344,7 @@ zcache_ensure_cmd() {
   fi
 
   # 使用 mv 原子替换正式缓存文件
-  # 这样如果 shell 中途被打断 正式缓存文件也更不容易处于半写入状态
+  # shell 中途被打断时正式缓存文件仍保持完整
   if mv "$tmp_file" "$cache_file"; then
     zsh_log_debug "zcache: ensure refresh-done key=$cache_key file=$cache_file"
     :
@@ -376,15 +369,13 @@ zcache_ensure_cmd() {
 }
 
 
-# - 调用 zcache_ensure_cmd 确保缓存文件存在且可用
-# - 然后 source 那个缓存文件
+# 调用 zcache_ensure_cmd 确保缓存文件存在且可用
+# 然后 source 那个缓存文件
 # 参数格式
 #   zcache_source_cmd <cache_key> [ttl_seconds] -- <command...>
 # 典型用途
 #   zcache_source_cmd "brew-shellenv" 86400 -- "$brew_bin" shellenv
-# 注意
-# 这里会 source 缓存文件 所以它只应该用于可信命令输出
-# 不要把不可信来源的文本拿来缓存并 source
+# 只用于可信命令输出
 zcache_source_cmd() {
   # 先确保缓存文件存在且可用
   local rc
@@ -407,7 +398,7 @@ zcache_source_cmd() {
   fi
 
   # 在当前 shell 中 source 缓存文件
-  # 必须 source 而不是开子进程执行 否则环境变量/PATH 变更不会回到当前 shell
+  # source 让环境变量和 PATH 变更回到当前 shell
   zsh_log_debug "zcache: source file=$cache_file"
   source "$cache_file"
   rc=$?

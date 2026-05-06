@@ -1,8 +1,8 @@
 # 00-core.zsh
 # 基础核心工具
-# 这个文件由 init.zsh 最先加载, 是整个框架里最基础的一层
+# init.zsh 最先加载的基础层
 
-# 只放通用, 轻量, 低依赖的函数
+# 只放通用 轻量 低依赖的函数
 # 不放具体业务逻辑
 # 不依赖后续 feature
 # 尽量不调用外部重命令
@@ -12,13 +12,13 @@
 # 默认值是 0 关闭
 # 推荐调试方式
 #   ZSH_DEBUG=1 zsh -lic 'exit'
-# 如果要在当前 shell 中连续测试, 也可以
+# 如果要在当前 shell 中连续测试 也可以
 #   export ZSH_DEBUG=1
 #   zsh -lic 'exit'
 typeset -g ZSH_DEBUG="${ZSH_DEBUG:-0}"
 
 # 统一构造消息前缀
-# 后续如果要给提示, 警告, 调试日志统一加颜色, 只需要改这一条路径
+# 提示 警告 调试日志的前缀集中在这一处
 zsh_message_prefix() {
   emulate -L zsh
 
@@ -28,8 +28,8 @@ zsh_message_prefix() {
 }
 
 # 统一输出消息
-# - info 走 stdout, 适合提示和帮助
-# - warn / error / debug 走 stderr, 适合异常和调试
+# info 走 stdout 适合提示和帮助
+# warn / error / debug 走 stderr 适合异常和调试
 zsh_msg() {
   emulate -L zsh
 
@@ -85,7 +85,7 @@ zsh_error() {
 }
 
 # 安全地 source 一个可选文件
-# 文件缺失不会报错
+# 文件缺失时静默跳过
 zsh_source_optional() {
   local file="$1"
 
@@ -114,8 +114,8 @@ zsh_source_required() {
 
 # 判断某个命令是否在当前 PATH 中可用
 # 返回值约定
-# - 命令存在, 返回 0
-# - 命令不存在, 返回 1
+# 命令存在 返回 0
+# 命令不存在 返回 1
 zsh_has_cmd() {
   (( $+commands[$1] ))
 }
@@ -169,7 +169,7 @@ zsh_now_seconds() {
 }
 
 # 获取文件的 mtime Unix 时间戳
-# 优先尝试 GNU stat, 再回退到 BSD stat
+# 优先尝试 GNU stat 再回退到 BSD stat
 zsh_file_mtime() {
   emulate -L zsh
 
@@ -194,17 +194,17 @@ zsh_file_mtime() {
 }
 
 # 校验 feature 名是否安全
-# 这里显式限制只允许字母, 数字, 下划线, 连字符
-# 目的不是美观, 而是防止出现路径穿越或奇怪的 source 目标
+# feature 名只允许字母 数字 下划线 连字符
+# 防止路径穿越和异常 source 目标
 zsh_feature_is_valid_name() {
   local name="$1"
   [[ "$name" =~ '^[A-Za-z0-9_-]+$' ]]
 }
 
 # 加载一个 feature 文件
-# - feature 名来自配置数组
-# - 文件路径固定为 $ZSH_FEATURE_DIR/<name>.zsh
-# - 缺失时输出警告并返回失败
+# feature 名来自配置数组
+# 文件路径固定为 $ZSH_FEATURE_DIR/<name>.zsh
+# 缺失时输出警告并返回失败
 zsh_load_feature() {
   local feature="$1"
   local file
@@ -228,8 +228,8 @@ zsh_load_feature() {
 }
 
 # 按数组顺序依次加载一组 feature
-# 这里保留顺序语义 谁在前就先执行
-# 这样用户可以通过数组顺序控制依赖链
+# 数组顺序就是加载顺序
+# 用户可以通过数组顺序控制依赖链
 zsh_load_feature_list() {
   local feature
   local rc=0

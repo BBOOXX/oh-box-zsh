@@ -1,9 +1,9 @@
 # 40-lazy.zsh
 # 命令懒加载工具
 
-# 让某些 很重的初始化逻辑 不要在 shell 启动时立刻执行
-# 改为 第一次真正调用相关命令时 再执行初始化
-# 初始化成功后 后续调用直接走真实命令 不再经过包装器
+# 把较重初始化延迟到首次命令调用
+# 首次调用相关命令时执行初始化
+# 初始化成功后后续调用直接走真实命令
 
 # __zlazy_loader_by_cmd
 #   记录 某个命令由哪个 loader 负责初始化
@@ -22,31 +22,30 @@ typeset -gA __zlazy_loader_by_cmd
 typeset -gA __zlazy_loader_done
 typeset -gA __zlazy_loader_active
 
-# 判断一个字符串是否是 适合作为 zsh 函数名 的安全名称
+# 判断字符串是否适合作为 zsh 函数名
 # zlazy_register 会动态定义包装函数
-# 为了避免 eval 注入和非法函数名 我们先把命令名限制成
-# - 首字符 字母或下划线
-# - 后续字符 字母 / 数字 / 下划线
+# 限制命令名以避免 eval 注入
+# 首字符 字母或下划线
+# 后续字符 字母 / 数字 / 下划线
 # 返回值
-# - 合法 0
-# - 非法 1
+# 合法 0
+# 非法 1
 zlazy_is_valid_name() {
   # 取第一个参数作为待检查名称
   local name="$1"
 
   # 使用正则做严格匹配
-  # 这里有意不支持带连字符的函数名
+  # 连字符不属于本项目允许的懒加载命令名字符
   [[ "$name" =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]]
 }
 
-# 为某个命令动态创建 懒加载包装函数
-# 这是内部函数 不给业务模块直接用
-# 外部应通过 zlazy_register 调用它
+# 为某个命令动态创建懒加载包装函数
+# 内部函数由 zlazy_register 调用
 # 例如为 tool 创建包装器后 实际会生成
 #   tool() {
 #     __zlazy_dispatch 'tool' "$@"
 #   }
-# 也就是 先进入统一分发器 再由分发器决定是否运行 loader
+# 包装函数先进入统一分发器 再由分发器决定是否运行 loader
 __zlazy_define_wrapper() {
   # 取目标命令名
   local cmd="$1"
@@ -58,18 +57,18 @@ __zlazy_define_wrapper() {
   zlazy_is_valid_name "$cmd" || return 1
 
   # 用 eval 动态定义函数
-  # 这里之所以使用 eval 是因为函数名本身需要由变量决定
-  # 前面已经做了函数名合法性检查 所以这里是可控的
+  # eval 用于按变量生成函数名
+  # 函数名已通过合法性检查
   # 函数体里把原始参数 "$@" 原样传给统一分发器
   # 并把 cmd 名字作为一个固定字面量传进去
   eval "${cmd}() { __zlazy_dispatch '${cmd}' \"\$@\"; }"
 }
 
-# 运行某个 loader 并处理它的状态标记
+# 运行 loader 并处理状态标记
 # 返回值
-# - loader 已经成功运行过 0
-# - 本次成功运行完成 0
-# - loader 不存在 / 运行失败 非 0
+# loader 已经成功运行过 0
+# 本次成功运行完成 0
+# loader 不存在 / 运行失败 非 0
 __zlazy_run_loader() {
   # 取 loader 函数名
   local loader="$1"
@@ -83,7 +82,7 @@ __zlazy_run_loader() {
     return 2
   fi
 
-  # 如果该 loader 之前已经成功执行过 就不再重复执行
+  # loader 成功执行过则跳过
   if [[ -n "${__zlazy_loader_done[$loader]:-}" ]]; then
     return 0
   fi
@@ -95,7 +94,7 @@ __zlazy_run_loader() {
     return 1
   fi
 
-  # 这里要求 loader 必须已经是一个已定义的 shell 函数
+  # loader 必须是已定义的 shell 函数
   if ! typeset -f "$loader" >/dev/null 2>&1; then
     zsh_msg warn zlazy "loader function not found: $loader"
     return 127
@@ -120,13 +119,12 @@ __zlazy_run_loader() {
     return "$rc"
   fi
 
-  # 到这里 说明 loader 已成功完成
-  # 记录该 loader 已完成 后续不再重复运行
+  # 标记 loader 已完成
   __zlazy_loader_done[$loader]=1
   return 0
 }
 
-# 这是所有懒加载包装函数的统一分发入口
+# 所有懒加载包装函数的统一分发入口
 # 逻辑流程
 # 根据命令名找到对应 loader
 # 先移除当前命令的包装函数
@@ -167,15 +165,14 @@ __zlazy_dispatch() {
     rc=$?
 
     # loader 失败时 把当前命令的包装器重新挂回去
-    # 保证下次调用还能继续尝试 而不是永久失去懒加载入口
+    # 保证下次调用还能继续尝试
     __zlazy_define_wrapper "$cmd" >/dev/null 2>&1 || true
 
     # 把 loader 的失败码原样返回给调用方
     return "$rc"
   fi
 
-  # 到这里说明 loader 已经成功
-  # 现在优先检查 loader 是否定义了一个同名 shell 函数
+  # loader 成功后优先检查同名 shell 函数
   if (( $+functions[$cmd] )); then
     "$cmd" "$@"
     return $?
@@ -183,7 +180,7 @@ __zlazy_dispatch() {
 
   # 如果没有同名 shell 函数 再尝试直接执行外部命令
   # command 会绕过 shell 函数查找 直接找外部命令
-  # 这适合 loader 只负责修改 PATH / 环境 而不负责定义函数的情况
+  # 支持只修改 PATH 或环境的 loader
   command "$cmd" "$@"
 }
 
@@ -194,12 +191,12 @@ __zlazy_dispatch() {
 #   zlazy_register tool_lazy_init tool
 # 如果想多个命令共用一个 loader 也可以
 #   zlazy_register some_loader foo bar baz
-# 这样
-# - 第一次调用 foo / bar / baz 中任意一个时
-# - 都会触发同一个 loader
+# 触发方式
+# 第一次调用 foo / bar / baz 任意一个时
+# 都会触发同一个 loader
 # 当前实现要求
-# - loader_func 必须已经是已定义函数
-# - cmd 名必须是合法 shell 函数名
+# loader_func 必须已经是已定义函数
+# cmd 名必须是合法 shell 函数名
 zlazy_register() {
   # 第一个参数是 loader 函数名
   local loader="$1"
@@ -223,7 +220,7 @@ zlazy_register() {
   fi
 
   # loader 必须已经存在 且必须是函数
-  # 这是为了把错误尽量提前暴露 而不是等第一次命令调用时才发现
+  # 注册时暴露 loader 命名错误
   if ! typeset -f "$loader" >/dev/null 2>&1; then
     zsh_msg warn zlazy "loader function not found at register time: $loader"
     return 2
@@ -237,7 +234,7 @@ zlazy_register() {
       return 2
     fi
 
-    # 记录 这个命令由哪个 loader 负责
+  # 记录命令对应的 loader
     __zlazy_loader_by_cmd[$cmd]="$loader"
 
     # 为该命令创建包装器
@@ -251,12 +248,10 @@ zlazy_register() {
   done
 }
 
-# 手动把某个 loader 标记为"已完成"
-# 这是一个辅助函数不是必需方便调试和过渡
+# 手动把某个 loader 标记为已完成
+# 调试和过渡辅助函数
 # 典型场景
-# - 后来改成了某个 loader 在启动时就主动执行
-# - 但仍然保留了之前的懒加载包装器定义
-# - 此时可以手工把 loader 标记成 done 避免它再跑一次
+# loader 已在启动时主动执行但仍保留懒加载包装器时使用
 zlazy_mark_loaded() {
   # 取 loader 名
   local loader="$1"
@@ -270,10 +265,9 @@ zlazy_mark_loaded() {
 
 # 清除某个 loader 的已完成状态
 # 典型场景
-# - 手工重载了某模块
-# - 想让某个 loader 下次再次真正执行
-# 注意
-# 这个函数只清状态不自动重新挂包装器
+# 手工重载了某模块
+# 想让某个 loader 下次再次真正执行
+# 函数只清状态不自动重新挂包装器
 # 如果某命令包装器已经被首次调用移除而还想重新懒加载
 # 需要重新执行 zlazy_register
 zlazy_reset_loader() {

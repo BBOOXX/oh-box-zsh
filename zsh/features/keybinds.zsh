@@ -1,18 +1,18 @@
 # features/keybinds.zsh
 # 常用按键与编辑模式
 
-# 这个 feature 负责接住最常见的交互手感问题
-# 它只做高价值, 低风险, 可解释的默认绑定
-# 不在这里塞个人专属快捷键
+# 处理常见交互键位
+# 只放高价值 低风险 可解释的默认绑定
+# 个人快捷键放到 user/local.zsh
 
-# 当前这层主要做这些事
-# 1. 根据 ZSH_KEYMAP 选择 emacs 或 vi
-# 2. 注册 Ctrl-X Ctrl-E 外部编辑能力
-# 3. 给上下箭头增加"按当前前缀搜索历史"的行为
-# 4. 让 Home / End, Delete, Shift-Tab 这些按键在常见终端里更稳定
-# 5. 尽量使用 terminfo, 避免写死终端转义序列
+# 职责
+# 1 根据 ZSH_KEYMAP 选择 emacs 或 vi
+# 2 注册 Ctrl-X Ctrl-E 外部编辑能力
+# 3 给上下箭头增加按当前前缀搜索历史的行为
+# 4 让 Home / End Delete Shift-Tab 这些按键在常见终端里更稳定
+# 5 尽量使用 terminfo 避免写死终端转义序列
 
-# 选择编辑模式.
+# 选择编辑模式
 if [[ "${ZSH_KEYMAP:-emacs}" == "vi" ]]; then
   bindkey -v
 else
@@ -20,12 +20,12 @@ else
 fi
 
 # 保持和 oh-my-zsh 接近的单词边界
-# 这样 Ctrl-W 会按 . / - 等符号分段回删, 保留原来的交互手感
+# Ctrl-W 会按 . / - 等符号分段回删
 WORDCHARS=''
 
 # 某些终端在 zle 激活时需要切到 application mode
-# 否则方向键, Home, End 等 terminfo 项可能表现不稳定
-# 这是一个比较常见但不显眼的兼容性补丁
+# 否则方向键 Home End 等 terminfo 项可能表现不稳定
+# application mode 兼容方向键 Home End 等按键
 function zle-line-init() {
   if (( ${ZSH_KEYBINDS_APPLICATION_MODE:-1} )) && (( ${+terminfo[smkx]} )) && (( ${+terminfo[rmkx]} )); then
     echoti smkx
@@ -51,7 +51,7 @@ zle -N edit-command-line
 bindkey '^X^E' edit-command-line
 
 # Ctrl-R 做增量历史搜索
-# 很多终端默认已经有这个绑定, 这里显式再绑一次, 避免不同 keymap 下行为漂移
+# 显式绑定可避免不同 keymap 下行为漂移
 bindkey '^R' history-incremental-search-backward
 
 # 清空方向键历史筛选状态
@@ -159,7 +159,7 @@ zsh_keybinds_step_history_older() {
   return 1
 }
 
-# 向更新的唯一历史项移动, 到头后回到原始输入
+# 向更新的唯一历史项移动 到头后回到原始输入
 zsh_keybinds_step_history_newer() {
   emulate -L zsh
 
@@ -226,7 +226,7 @@ zsh_keybinds_history_search_up() {
   zsh_keybinds_step_history_older || return 0
 }
 
-# 下箭头在筛选结果间回退, 最后回到原始输入
+# 下箭头在筛选结果间回退 最后回到原始输入
 zsh_keybinds_history_search_down() {
   emulate -L zsh
 
@@ -251,10 +251,10 @@ zsh_keybinds_history_search_down() {
 zsh_keybinds_reset_history_search
 
 # 上下箭头按当前输入筛选历史
-# 默认使用固定前缀匹配
-# 如果当前行为空, 方向键先走普通历史
-# 只有用户自己改了当前行, 才把这行当成新的前缀
-# 如果需要旧的行首前缀行为, 可以显式切回 prefix 模式
+# 默认使用 sticky-prefix 模式
+# 如果当前行为空 方向键先走普通历史
+# 只有用户自己改了当前行 才把这行当成新的前缀
+# 如果需要旧的行首前缀行为 可以显式切回 prefix 模式
 if (( ${ZSH_KEYBINDS_HISTORY_PREFIX_SEARCH:-1} )); then
   case "${ZSH_KEYBINDS_HISTORY_SEARCH_MODE:-sticky-prefix}" in
     prefix)
@@ -281,7 +281,7 @@ if (( ${ZSH_KEYBINDS_HISTORY_PREFIX_SEARCH:-1} )); then
   bindkey -M vicmd '^[[A' "$__zsh_keybinds_history_up_widget"
   bindkey -M vicmd '^[[B' "$__zsh_keybinds_history_down_widget"
 
-  # 如果 terminfo 提供更可靠的键值, 再补一层
+  # 如果 terminfo 提供更可靠的键值 再补一层
   if [[ -n "${terminfo[kcuu1]:-}" ]]; then
     bindkey -M emacs "${terminfo[kcuu1]}" "$__zsh_keybinds_history_up_widget"
     bindkey -M viins "${terminfo[kcuu1]}" "$__zsh_keybinds_history_up_widget"
@@ -318,7 +318,7 @@ if (( ${ZSH_KEYBINDS_SHIFT_TAB_REVERSE_MENU:-1} )) && [[ -n "${terminfo[kcbt]:-}
 fi
 
 # Delete 键
-# 一部分终端会通过 terminfo[kdch1] 提供, 另一部分只会发 ^[[3~
+# 一部分终端会通过 terminfo[kdch1] 提供 另一部分只会发 ^[[3~
 if (( ${ZSH_KEYBINDS_DELETE:-1} )); then
   if [[ -n "${terminfo[kdch1]:-}" ]]; then
     bindkey -M emacs "${terminfo[kdch1]}" delete-char

@@ -32,7 +32,7 @@ if (( ${ZSH_IS_MACOS:-0} )); then
   alias fuckdsstore='fd -HI "^\.DS_Store$" . -t f -x rm -f'
 fi
 
-# 只拦截最常见的 cd ... 用法, 其它参数保持 builtin cd 语义
+# 只拦截常见 cd ... 用法 其他参数保持 builtin cd 语义
 cd() {
   if [[ "$#" -eq 1 && "$1" == "..." ]]; then
     builtin cd ../..
@@ -43,8 +43,8 @@ cd() {
 }
 
 
-# SSH 会话需要把代理回指到客户端
-# 本地 shell 则直接走 127.0.0.1
+# SSH 会话把代理回指到客户端
+# 本地 shell 直接走 127.0.0.1
 setproxy() {
   local proxy_host="127.0.0.1"
   local ssh_peer
@@ -77,7 +77,7 @@ unsetproxy() {
   unset http_proxy
 }
 
-# 从 ~/.ssh/config 中抽取显式 Host, 让 ssh/scp 都能补全
+# 从 ~/.ssh/config 抽取显式 Host 让 ssh/scp 补全
 _zsh_local_complete_ssh_hosts() {
   local config_file="$HOME/.ssh/config"
   local line
@@ -105,6 +105,6 @@ _zsh_local_complete_ssh_hosts() {
 
 zstyle -e ':completion:*:*:*:hosts' hosts '_zsh_local_complete_ssh_hosts'
 
-# iTerm2 工具本身是独立脚本, 不依赖 shell integration hook
-# 这里仅在目录存在时把它加入 PATH, 避免 source 整份集成脚本
+# iTerm2 工具是独立脚本 不依赖 shell integration hook
+# 目录存在时加入 PATH 避免 source 整份集成脚本
 path_prepend "$HOME/.iterm2"

@@ -38,7 +38,7 @@ __zsh_avit_build_user_host_segment() {
   fi
 }
 
-# 把外部工具给出的环境名收敛成纯文本, 避免把它们自己的 prompt 包装继续带进主题.
+# 把外部工具给出的环境名收敛成纯文本 避免带入外部 prompt 包装
 __zsh_avit_normalize_python_env_name() {
   emulate -L zsh
   setopt extended_glob
@@ -61,7 +61,7 @@ __zsh_avit_normalize_python_env_name() {
 }
 
 
-# 优先用工具声明的展示名, pipenv 再回退到项目目录名, 最后才退回虚拟环境目录名.
+# 优先用工具声明的展示名 pipenv 再回退到项目目录名 最后才退回虚拟环境目录名
 __zsh_avit_detect_python_env_name() {
   emulate -L zsh
 
@@ -103,7 +103,7 @@ __zsh_avit_build_virtualenv_segment() {
   fi
 }
 
-# 只在 vi keymap 的命令模式下显示提示, 减少常驻噪音.
+# 只在 vi keymap 的命令模式下显示提示 减少常驻噪音
 __zsh_avit_update_vi_mode_segment() {
   emulate -L zsh
 
@@ -120,7 +120,7 @@ __zsh_avit_update_vi_mode_segment() {
 }
 
 
-# 优先读 zsh 自带时间参数, 缺失时再退回外部 date
+# 优先读 zsh 自带时间参数 缺失时再退回外部 date
 __zsh_avit_now_seconds() {
   emulate -L zsh
 
@@ -269,7 +269,7 @@ __zsh_avit_build_git_segments() {
   __zsh_avit_rprompt_segment="${right%% }"
 }
 
-# 在每次显示 prompt 前集中刷新动态段.
+# 在每次显示 prompt 前集中刷新动态段
 __zsh_avit_precmd() {
   emulate -L zsh
 
@@ -283,7 +283,7 @@ __zsh_avit_precmd() {
   __zsh_avit_build_git_segments
 }
 
-# 链接已有 zle-line-init, 同时初始化 vi mode 提示.
+# 链接已有 zle-line-init 并初始化 vi mode 提示
 __zsh_avit_zle_line_init() {
   emulate -L zsh
 
@@ -294,7 +294,7 @@ __zsh_avit_zle_line_init() {
   __zsh_avit_update_vi_mode_segment
 }
 
-# 在 vi insert 和 command 模式切换时即时刷新 prompt.
+# 在 vi insert 和 command 模式切换时即时刷新 prompt
 __zsh_avit_zle_keymap_select() {
   emulate -L zsh
 
@@ -326,7 +326,7 @@ fi
 
 __zsh_avit_precmd
 
-# 用相邻字符串保留原始 prompt 语义, 同时避免多行单引号破坏编辑器高亮.
+# 用相邻字符串保留原始 prompt 语义 同时避免多行单引号破坏编辑器高亮
 PROMPT='${__zsh_avit_user_host_segment}${__zsh_avit_dir_segment}${__zsh_avit_git_left_segment}${__zsh_avit_virtualenv_segment}${__zsh_avit_vi_mode_segment}'$'\n''%(!.%F{red}.%F{white})▶%f '
 
 PROMPT2='%(!.%F{red}.%F{white})◀%f '

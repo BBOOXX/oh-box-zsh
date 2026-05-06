@@ -1,11 +1,11 @@
 # features/z.zsh
 # 目录跳转索引
 
-# 这个 feature 迁入了 OMZ z 插件里最核心的体验.
-# 1. 记录你 cd 过的目录
-# 2. 用最近访问时间做主排序, 访问次数只做次级打分
-# 3. 提供 z 命令做快速跳转
-# 4. 把状态放到缓存目录, 不污染声明层和脚本层
+# 迁入 OMZ z 插件的核心跳转体验
+# 1 记录你 cd 过的目录
+# 2 用最近访问时间做主排序 访问次数只做次级打分
+# 3 提供 z 命令做快速跳转
+# 4 把状态放到缓存目录 不污染声明层和脚本层
 
 if [[ -n "${__zsh_feature_z_loaded:-}" ]]; then
   return 0
@@ -25,7 +25,7 @@ __zsh_z_scores=()
 __zsh_z_times=()
 
 # 校验路径文本是否适合进入索引
-# 这里只做字符串层面的格式限制, 避免在热路径里频繁做文件系统探测
+# 字符串层面限制格式 避免热路径文件系统探测
 __zsh_z_is_valid_path_text() {
   emulate -L zsh
 
@@ -38,8 +38,8 @@ __zsh_z_is_valid_path_text() {
   return 0
 }
 
-# 过滤不适合写入索引的路径
-# 这里显式跳过不存在目录, 相对路径和带换行 / Tab 的路径
+# 过滤不写入索引的路径
+# 跳过不存在目录 相对路径和带换行 / Tab 的路径
 __zsh_z_should_track_path() {
   emulate -L zsh
 
@@ -51,7 +51,7 @@ __zsh_z_should_track_path() {
 }
 
 # 清空内存态索引
-# 这个动作很轻, 让首次加载和按需重载都能走同一条路径
+# 首次加载和按需重载共用同一条路径
 __zsh_z_reset_db() {
   emulate -L zsh
 
@@ -59,8 +59,8 @@ __zsh_z_reset_db() {
   __zsh_z_times=()
 }
 
-# 从缓存文件读回目录索引.
-# 只接受三列纯文本格式: visits<TAB>last_access<TAB>path
+# 从缓存文件读回目录索引
+# 只接受三列纯文本格式 visits<TAB>last_access<TAB>path
 __zsh_z_load_db() {
   emulate -L zsh
 
@@ -83,8 +83,8 @@ __zsh_z_load_db() {
   __zsh_z_prune_db
 }
 
-# 确保当前 shell 里的索引已经就绪.
-# 只在第一次使用或数据文件 mtime 变化时才从磁盘重读.
+# 确保当前 shell 里的索引已经就绪
+# 只在第一次使用或数据文件 mtime 变化时才从磁盘重读
 __zsh_z_ensure_db_loaded() {
   emulate -L zsh
 
@@ -106,8 +106,8 @@ __zsh_z_ensure_db_loaded() {
   __zsh_z_db_mtime="$mtime"
 }
 
-# 把目录索引刷回缓存文件.
-# 只有在真正发生目录访问时才落盘, 避免 shell 启动时白白做一次 I/O.
+# 把目录索引刷回缓存文件
+# 只有在真正发生目录访问时才落盘 避免 shell 启动时白白做一次 I/O
 __zsh_z_save_db() {
   emulate -L zsh
 
@@ -142,9 +142,9 @@ __zsh_z_save_db() {
   fi
 }
 
-# 生成排序键.
-# 最近访问优先能省掉每次查询都做一次时间桶计算, 查询路径更短.
-# 访问次数只拿来做同时间戳下的次级排序, 保留一点长期价值.
+# 生成排序键
+# 最近访问优先 查询路径更短
+# 访问次数只拿来做同时间戳下的次级排序 保留一点长期价值
 __zsh_z_rank_key() {
   emulate -L zsh
 
@@ -157,8 +157,8 @@ __zsh_z_rank_key() {
   REPLY="${(l:10::0:)last_access}"$'\t'"${(l:6::0:)visits}"
 }
 
-# 清理非法记录, 并把索引规模控制在上限内.
-# 热路径只做字符串校验, 不在每次 cd 时把整张表重新 stat 一遍.
+# 清理非法记录 并把索引规模控制在上限内
+# 热路径只做字符串校验 避免每次 cd 都 stat 整张表
 __zsh_z_prune_db() {
   emulate -L zsh
 
@@ -217,8 +217,8 @@ __zsh_z_prune_db() {
   done
 }
 
-# 把一条目录访问事件写进内存索引并持久化.
-# 当前 shell 只在第一次触发时读盘, 后续直接复用内存态更新.
+# 把一条目录访问事件写进内存索引并持久化
+# 当前 shell 按需读盘 后续复用内存态更新
 __zsh_z_touch_dir() {
   emulate -L zsh
 
@@ -243,8 +243,8 @@ __zsh_z_touch_dir() {
   __zsh_z_save_db || return $?
 }
 
-# 从内存态里移除一条坏记录并尝试落盘.
-# 这里只在真正要跳转时发现目标目录已失效才触发, 避免把 stat 放到查询热路径里.
+# 从内存态里移除一条坏记录并尝试落盘
+# 跳转时发现目录失效再清理索引 避免查询热路径 stat
 __zsh_z_drop_path() {
   emulate -L zsh
 
@@ -256,15 +256,15 @@ __zsh_z_drop_path() {
   __zsh_z_save_db >/dev/null 2>&1 || true
 }
 
-# chpwd hook 入口.
-# 目录变更后由 zsh 自动调用.
+# chpwd hook 入口
+# 目录变更后由 zsh 自动调用
 __zsh_z_record_pwd() {
   emulate -L zsh
   __zsh_z_touch_dir "${1:-$PWD}"
 }
 
-# 判断目录路径是否命中查询词.
-# 多个词时要求按顺序出现, 这样 z foo bar 的结果更可控.
+# 判断目录路径是否命中查询词
+# 多个词必须按顺序出现
 __zsh_z_path_matches() {
   emulate -L zsh
 
@@ -292,8 +292,8 @@ __zsh_z_path_matches() {
   return 0
 }
 
-# 收集匹配目录并按排序键排序.
-# 结果通过 reply 数组返回.
+# 收集匹配目录并按排序键排序
+# 结果通过 reply 数组返回
 __zsh_z_collect_matches() {
   emulate -L zsh
 
@@ -322,8 +322,8 @@ __zsh_z_collect_matches() {
   reply=("${records[@]}")
 }
 
-# 为 zsh completion 产出目录候选.
-# 候选直接取完整路径, 这样补全后 z 仍然能走直接 cd 的快路径.
+# 为 zsh completion 产出目录候选
+# 候选直接取完整路径 补全后 z 仍走直接 cd 快路径
 __zsh_z_completion_candidates() {
   emulate -L zsh
 
@@ -349,8 +349,8 @@ __zsh_z_completion_candidates() {
   reply=("${candidates[@]}")
 }
 
-# 打印匹配列表.
-# 默认只展示有限条数, 避免索引很大时刷屏.
+# 打印匹配列表
+# 默认只展示有限条数 避免索引很大时刷屏
 __zsh_z_print_matches() {
   emulate -L zsh
 
@@ -379,7 +379,7 @@ __zsh_z_print_matches() {
   done
 }
 
-# 输出 z 命令帮助.
+# 输出 z 命令帮助
 __zsh_z_print_help() {
   zsh_msg info z 'usage: z [-l] [keywords...]'
   zsh_msg info z '  z foo bar   jump to the best matching directory'
@@ -421,8 +421,8 @@ _z() {
   candidates=("${reply[@]}")
 
   if (( ${#candidates[@]} )); then
-    # 候选已经按 z 自己的规则完成过滤.
-    # 这里用 -U 关闭 compadd 的二次前缀匹配, 否则 `z down<Tab>` 不会命中 `/.../Downloads`.
+    # 候选已经按 z 自己的规则完成过滤
+    # -U 关闭 compadd 二次前缀匹配 确保 `z down<Tab>` 命中 `/.../Downloads`
     compadd -Q -U -- "${candidates[@]}"
     return 0
   fi

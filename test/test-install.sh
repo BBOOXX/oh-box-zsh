@@ -13,7 +13,7 @@ source "$REPO_ROOT/test/lib/assert.sh"
 source "$REPO_ROOT/install.sh"
 
 # install.sh 在顶层开启了 -e
-# 这里恢复测试脚本自己的策略, 允许继续收集后续断言结果
+# 恢复测试脚本策略 允许继续收集后续断言结果
 set +e
 
 # 通过共享全局变量驱动 install.sh 的 helper 行为

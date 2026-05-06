@@ -2,13 +2,13 @@
 set -u
 set -o pipefail
 # 测试脚本故意不开 -e
-# 这样某一步失败后仍能继续跑完剩余检查, 最后一次性汇总失败项
+# 某一步失败后继续跑完剩余检查 最后一次性汇总失败项
 
 REPO_ROOT="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
 # shellcheck source=./test/lib/assert.sh
 source "$REPO_ROOT/test/lib/assert.sh"
 
-# 测试脚本位于 test/ 子目录, 所以上一层就是仓库根
+# 测试脚本位于 test/ 子目录 所以上一层就是仓库根
 
 BASH_BIN="$(command -v bash 2>/dev/null || true)"
 SHELLCHECK_BIN="$(command -v shellcheck 2>/dev/null || true)"
@@ -177,7 +177,7 @@ else
   printf 'zsh  = %s\n' "$ZSH_BIN"
   "$ZSH_BIN" --version
 
-  # 构造需要做 zsh -n 语法检查的文件列表.
+  # 构造需要做 zsh -n 语法检查的文件列表
   SYNTAX_LIST_FILE="$TMPROOT/syntax-list.txt"
   : > "$SYNTAX_LIST_FILE"
 
@@ -211,14 +211,14 @@ else
     fail "core helper 单元测试失败"
   fi
 
-  # 为了验证 config 和 local 的加载时机, 我们创建一个临时仓库副本并往里注入测试 feature.
+  # 创建临时仓库副本并注入测试 feature 以验证 config 和 local 加载时机
   TMPREPO="$TMPROOT/runtime-repo"
   cp -R "$REPO_ROOT" "$TMPREPO"
 
   cat > "$TMPREPO/zsh/user/config.zsh" <<'EOF'
-# 这个临时 config 用于验证.
-# 1. config 在 login feature 之前可见.
-# 2. interactive 也能看到 config.
+# 临时 config 用于验证
+# 1 config 在 login feature 之前可见
+# 2 interactive 也能看到 config
 typeset -g TEST_CONFIG_MARK="loaded_from_config"
 typeset -ga ZSH_LOGIN_FEATURES
 ZSH_LOGIN_FEATURES=(env-path pyenv test-login-probe)
@@ -229,7 +229,7 @@ ZSH_KEYMAP="vi"
 EOF
 
   cat > "$TMPREPO/zsh/user/local.zsh" <<'EOF'
-# 这个临时 local 用于验证 interactive 末尾加载.
+# 临时 local 用于验证 interactive 末尾加载
 typeset -g TEST_LOCAL_MARK="loaded_from_local"
 
 cd() {
@@ -243,7 +243,7 @@ cd() {
 EOF
 
   cat > "$TMPREPO/zsh/features/test-login-probe.zsh" <<'EOF'
-# 这个临时 feature 用来验证 login feature 加载时, config 是否已经可见.
+# 临时 feature 验证 login feature 加载时 config 是否已经可见
 if [[ "${TEST_CONFIG_MARK:-}" == "loaded_from_config" ]]; then
   typeset -g TEST_LOGIN_PROBE="config_visible_before_login"
 else
@@ -376,8 +376,8 @@ EOF
     assert_contains "$INTERACTIVE_OUT" '__zsh_avit_rprompt_segment' "avit 主题会接管右侧 prompt"
     assert_contains "$INTERACTIVE_OUT" 'avit_func=yes' "avit 主题的 precmd 钩子函数已加载"
 
-    # 再做一组默认 UX 验证.
-    # 这里只验证最关键的几个默认行为是否真的被打开.
+    # 再做一组默认 UX 验证
+    # 验证关键默认行为已开启
     # shellcheck disable=SC2016
     if run_capture UX_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic 'typeset -a matchers; zstyle -a ":completion:*" matcher-list matchers >/dev/null 2>&1; print -r -- "matchers=${(j:|:)matchers} opt_complete_in_word=${options[completeinword]:-off} opt_auto_menu=${options[automenu]:-off} opt_share_history=${options[sharehistory]:-off} opt_hist_verify=${options[histverify]:-off}"; bindkey -M emacs "^[[A"; bindkey -M emacs "^[[B"'
   then
@@ -424,12 +424,12 @@ EOF
   cp -R "$REPO_ROOT" "$DEFAULT_REPO"
 
   cat > "$DEFAULT_REPO/zsh/user/config.zsh" <<'EOF'
-# 这个临时 config 故意不声明 feature 列表.
+# 临时 config 故意不声明 feature 列表
 typeset -g TEST_DEFAULT_CONFIG_MARK="loaded_without_feature_lists"
 EOF
 
   cat > "$DEFAULT_REPO/zsh/user/local.zsh" <<'EOF'
-# 这个临时 local 用于验证 interactive 默认仍会加载 local 层.
+# 临时 local 验证 interactive 默认仍会加载 local 层
 typeset -g TEST_DEFAULT_LOCAL_MARK="loaded_from_default_local"
 EOF
 

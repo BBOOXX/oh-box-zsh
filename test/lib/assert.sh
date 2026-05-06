@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Bash 测试共享 helper
-# 这里只放和具体用例无关的输出, 捕获, 断言函数
+# 通用输出 捕获 断言函数
 
 : "${PASS_COUNT:=0}"
 : "${FAIL_COUNT:=0}"
@@ -31,7 +31,7 @@ warn() {
 }
 
 # 执行命令并同时捕获标准输出和标准错误
-# 第一个参数是变量名, 用来接收输出内容
+# 第一个参数是变量名 用来接收输出内容
 run_capture() {
   local __var_name="$1"
   shift
@@ -46,7 +46,7 @@ run_capture() {
   return "$__rc"
 }
 
-# 判断路径是否存在, 包括坏掉的符号链接
+# 判断路径是否存在 包括坏掉的符号链接
 assert_exists() {
   local path="$1"
   local msg="$2"
@@ -58,7 +58,7 @@ assert_exists() {
   fi
 }
 
-# 判断路径不存在, 包括不是坏掉的符号链接
+# 判断路径缺失且非符号链接
 assert_not_exists() {
   local path="$1"
   local msg="$2"
@@ -210,7 +210,7 @@ assert_not_contains() {
   fi
 }
 
-# 打印一段输出块, 方便排查失败原因
+# 打印一段输出块 方便排查失败原因
 print_block() {
   local title="$1"
   local body="$2"

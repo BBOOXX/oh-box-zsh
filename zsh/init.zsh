@@ -1,29 +1,29 @@
 # init.zsh 是整个框架的唯一 bootstrap 入口
 
-# 它的职责被严格限制为以下几件事
-# 1. 确认当前 shell 的确是 zsh
-# 2. 建立目录变量
-# 3. 加载 core 层
-# 4. 做环境探测
-# 5. 加载用户声明式配置
-# 6. 按阶段分发到 login 或 interactive
+# init.zsh 职责
+# 1 确认当前 shell 的确是 zsh
+# 2 建立目录变量
+# 3 加载 core 层
+# 4 做环境探测
+# 5 加载用户声明式配置
+# 6 按阶段分发到 login 或 interactive
 
 # 目录职责
-# - core 基础设施
-# - features 功能实现
-# - stage 阶段调度
-# - user/config.zsh 声明式配置
-# - user/local.zsh 个人脚本
+# core 基础设施
+# features 功能实现
+# stage 阶段调度
+# user/config.zsh 声明式配置
+# user/local.zsh 个人脚本
 
-# 如果当前 shell 不是 zsh, 立刻停止
-# 这个分支必须尽量使用通用 shell 语法, 因为 zsh 专属语法还没有开始执行
+# 非 zsh shell 直接停止
+# 当前分支使用通用 shell 语法
 if [ -z "${ZSH_VERSION-}" ]; then
   printf '%s\n' '[zsh-init] skip: current shell is not zsh.' >&2
   return 0 2>/dev/null || exit 0
 fi
 
 # 建立目录变量
-# 这些变量会被后续 core, feature, stage 层共享使用
+# 这些变量会被后续 core feature stage 层共享使用
 typeset -g ZSH_ROOT="$ZDOTDIR"
 typeset -g ZSH_CORE_DIR="$ZSH_ROOT/core"
 typeset -g ZSH_FEATURE_DIR="$ZSH_ROOT/features"
@@ -33,7 +33,7 @@ typeset -g ZSH_USER_DIR="$ZSH_ROOT/user"
 typeset -g ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
 
 # 先尝试准备缓存目录
-# 失败时也不直接终止, 因为不是所有 feature 都依赖缓存目录
+# 缓存目录失败不直接终止 有些 feature 不依赖缓存
 mkdir -p "$ZSH_CACHE_DIR" 2>/dev/null
 
 # framework bootstrap 保护 确保只运行一次
@@ -58,7 +58,7 @@ if [[ -z "${__zsh_framework_bootstrapped:-}" ]]; then
   zsh_source_optional "$ZSH_CORE_DIR/40-lazy.zsh"
 
   # 做一次环境探测
-  # 这是给 feature 层提供事实输入, 例如 macOS / Linux, arm64 / x86_64, SSH, Termux, WSL
+  # 为 feature 层提供平台和环境事实
   if typeset -f zsh_detect_env >/dev/null 2>&1; then
     zsh_detect_env
   fi
@@ -73,10 +73,10 @@ if [[ -z "${__zsh_framework_bootstrapped:-}" ]]; then
 fi
 
 # 阶段执行保护
-# login 和 interactive 各自只应在当前 shell 中执行一次.
+# login 和 interactive 各自只应在当前 shell 中执行一次
 typeset -gA __zsh_stage_loaded
 
-# 如果外部没有明确设置阶段, 则默认按 interactive 处理
+# 如果外部没有明确设置阶段 则默认按 interactive 处理
 : "${ZSH_INIT_STAGE:=interactive}"
 
 # 按阶段分发
@@ -95,7 +95,7 @@ case "$ZSH_INIT_STAGE" in
     ;;
   *)
     # 非法阶段属于显式配置错误
-    # 这里直接失败, 避免 shell 落入"bootstrap 已完成但 stage 未执行"的半初始化状态
+    # 直接失败 避免 shell 进入 bootstrap 完成但 stage 未执行的半初始化状态
     zsh_msg error zsh-init "unknown stage: $ZSH_INIT_STAGE"
     return 1 2>/dev/null || exit 1
     ;;
