@@ -53,6 +53,7 @@ zsh_autosuggestions_default_candidates() {
     linux:*)
       candidates=(
         "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+        "/usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
         "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
         "/home/linuxbrew/.linuxbrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
       )
