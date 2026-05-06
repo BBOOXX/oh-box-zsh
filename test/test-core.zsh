@@ -132,6 +132,7 @@ source "$ZSH_CORE_DIR/30-cache.zsh" || exit 1
 source "$ZSH_CORE_DIR/40-lazy.zsh" || exit 1
 
 typeset -ga ORIGINAL_PATH=("${path[@]}")
+typeset -ga ORIGINAL_FPATH=("${fpath[@]}")
 
 log STEP "00-core.zsh"
 
@@ -812,6 +813,72 @@ path=("${TEST_TMUX_SAVED_PATH[@]}")
 rehash
 unfunction tmux 2>/dev/null || true
 
+log STEP "features/completion.zsh"
+
+HAD_ZSH_COMPLETION_USE_SYSTEM_FPATHS="${+ZSH_COMPLETION_USE_SYSTEM_FPATHS}"
+OLD_ZSH_COMPLETION_USE_SYSTEM_FPATHS="${ZSH_COMPLETION_USE_SYSTEM_FPATHS-}"
+HAD_ZSH_COMPLETION_EXTRA_FPATHS="${+ZSH_COMPLETION_EXTRA_FPATHS}"
+typeset -ga OLD_ZSH_COMPLETION_EXTRA_FPATHS=("${ZSH_COMPLETION_EXTRA_FPATHS[@]}")
+HAD_COMPLETION_ZSH_OS="${+ZSH_OS}"
+OLD_COMPLETION_ZSH_OS="${ZSH_OS-}"
+HAD_COMPLETION_HOMEBREW_PREFIX="${+HOMEBREW_PREFIX}"
+OLD_COMPLETION_HOMEBREW_PREFIX="${HOMEBREW_PREFIX-}"
+
+typeset -g TEST_COMPLETION_EXTRA_FPATH="$TMPROOT/fake-zsh-completions"
+typeset -g TEST_COMPLETION_MISSING_FPATH="$TMPROOT/missing-zsh-completions"
+typeset -g TEST_COMPLETION_HOMEBREW_PREFIX="$TMPROOT/fake-completion-homebrew"
+mkdir -p "$TEST_COMPLETION_EXTRA_FPATH"
+mkdir -p "$TEST_COMPLETION_HOMEBREW_PREFIX/share/zsh-completions"
+
+typeset -gi ZSH_COMPLETION_USE_SYSTEM_FPATHS=0
+typeset -ga ZSH_COMPLETION_EXTRA_FPATHS=(
+  "$TEST_COMPLETION_MISSING_FPATH"
+  "$TEST_COMPLETION_EXTRA_FPATH"
+  "$TEST_COMPLETION_EXTRA_FPATH"
+)
+
+fpath=("${ORIGINAL_FPATH[@]}")
+source "$REPO_ROOT/zsh/features/completion.zsh" || exit 1
+
+assert_contains "${(j.:.)fpath}" "$TEST_COMPLETION_EXTRA_FPATH" "completion feature accepts declared extra fpath"
+
+typeset -gi TEST_COMPLETION_EXTRA_FPATH_COUNT=0
+typeset -gi TEST_COMPLETION_MISSING_FPATH_COUNT=0
+typeset -g TEST_COMPLETION_FPATH_ITEM
+for TEST_COMPLETION_FPATH_ITEM in "${fpath[@]}"; do
+  [[ "$TEST_COMPLETION_FPATH_ITEM" == "$TEST_COMPLETION_EXTRA_FPATH" ]] && (( TEST_COMPLETION_EXTRA_FPATH_COUNT += 1 ))
+  [[ "$TEST_COMPLETION_FPATH_ITEM" == "$TEST_COMPLETION_MISSING_FPATH" ]] && (( TEST_COMPLETION_MISSING_FPATH_COUNT += 1 ))
+done
+assert_eq "$TEST_COMPLETION_EXTRA_FPATH_COUNT" "1" "completion feature deduplicates extra fpath entries"
+assert_eq "$TEST_COMPLETION_MISSING_FPATH_COUNT" "0" "completion feature skips missing extra fpath entries"
+
+typeset -gi ZSH_COMPLETION_USE_SYSTEM_FPATHS=1
+HOMEBREW_PREFIX="$TEST_COMPLETION_HOMEBREW_PREFIX"
+fpath=("${ORIGINAL_FPATH[@]}")
+zsh_completion_setup_fpath
+assert_contains "${(j.:.)fpath}" "$TEST_COMPLETION_HOMEBREW_PREFIX/share/zsh-completions" "completion feature accepts Homebrew zsh-completions fpath"
+
+ZSH_OS="macos"
+assert_status 0 "zsh_completion_system_fpath_candidates supports macOS" zsh_completion_system_fpath_candidates
+assert_contains "${(j.:.)reply}" "/opt/homebrew/share/zsh-completions" "macOS completion 候选路径包含 Homebrew zsh-completions"
+assert_contains "${(j.:.)reply}" "/usr/local/share/zsh/site-functions" "macOS completion 候选路径包含通用 site-functions"
+
+ZSH_OS="linux"
+assert_status 0 "zsh_completion_system_fpath_candidates supports Linux" zsh_completion_system_fpath_candidates
+assert_contains "${(j.:.)reply}" "/usr/share/zsh/plugins/zsh-completions/src" "Linux completion 候选路径包含 Alpine zsh-completions"
+assert_contains "${(j.:.)reply}" "/usr/share/zsh/vendor-completions" "Linux completion 候选路径包含 vendor-completions"
+
+fpath=("${ORIGINAL_FPATH[@]}")
+restore_var ZSH_OS "$HAD_COMPLETION_ZSH_OS" "$OLD_COMPLETION_ZSH_OS"
+restore_var HOMEBREW_PREFIX "$HAD_COMPLETION_HOMEBREW_PREFIX" "$OLD_COMPLETION_HOMEBREW_PREFIX"
+restore_var ZSH_COMPLETION_USE_SYSTEM_FPATHS "$HAD_ZSH_COMPLETION_USE_SYSTEM_FPATHS" "$OLD_ZSH_COMPLETION_USE_SYSTEM_FPATHS"
+if (( HAD_ZSH_COMPLETION_EXTRA_FPATHS )); then
+  typeset -ga ZSH_COMPLETION_EXTRA_FPATHS=("${OLD_ZSH_COMPLETION_EXTRA_FPATHS[@]}")
+else
+  unset ZSH_COMPLETION_EXTRA_FPATHS
+fi
+unset TEST_COMPLETION_EXTRA_FPATH TEST_COMPLETION_MISSING_FPATH TEST_COMPLETION_HOMEBREW_PREFIX TEST_COMPLETION_EXTRA_FPATH_COUNT TEST_COMPLETION_MISSING_FPATH_COUNT TEST_COMPLETION_FPATH_ITEM
+
 log STEP "features/keybinds.zsh"
 
 HAD_ZSH_KEYMAP="${+ZSH_KEYMAP}"
@@ -944,7 +1011,7 @@ assert_eq "$REPLY" "/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 ZSH_OS="linux"
 ZSH_ARCH="x86_64"
 assert_status 0 "zsh_autosuggestions_default_candidates supports Linux" zsh_autosuggestions_default_candidates
-assert_eq "${(j.:.)reply}" "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh:/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh:/home/linuxbrew/.linuxbrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Linux autosuggestions 候选路径按优先级排列"
+assert_eq "${(j.:.)reply}" "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh:/usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh:/usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh:/home/linuxbrew/.linuxbrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Linux autosuggestions 候选路径按优先级排列"
 assert_status 0 "zsh_autosuggestions_default_file supports Linux" zsh_autosuggestions_default_file
 assert_eq "$REPLY" "/usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh" "Linux 默认 autosuggestions 首选系统包路径"
 

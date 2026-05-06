@@ -1,64 +1,136 @@
 # features/completion.zsh
 # 补全系统初始化
 
-# 这个 feature 的目标不是把所有能开的都开满
-# 目标是
-# 1. 启用 zsh 原生补全系统
-# 2. 把高频且低风险的体验增强做成默认值
-# 3. 把每个增强点都抽成配置项
-# 4. 保证以后你如果想关掉某一种补全行为, 只改 config.zsh 就够了
+# 启用 zsh 原生补全并配置高频交互行为
+# 每个增强点都有独立配置项
 
-# 这里迁入的主要体验包括
-# - 自动弹出菜单
-# - 在单词中间补全
-# - 补全后把光标移到单词末尾
-# - 大小写不敏感
-# - substring 匹配
-# - partial-word 匹配
-# - compdump 缓存文件单独存放
-# 这些都仍然是 zsh 原生能力, 不是第三方框架能力
+# 把已存在的补全函数目录追加到 fpath 尾部
+zsh_completion_append_fpath_dir() {
+  emulate -L zsh
+
+  local dir="$1"
+  local item
+
+  [[ -n "$dir" ]] || return 0
+  [[ -d "$dir" ]] || return 0
+
+  for item in "${fpath[@]}"; do
+    [[ "$item" == "$dir" ]] && return 0
+  done
+
+  fpath+=("$dir")
+}
+
+# 常见系统 fpath 候选目录
+# 覆盖 Homebrew Linuxbrew site-functions vendor-completions 和 Alpine zsh-completions
+zsh_completion_system_fpath_candidates() {
+  emulate -L zsh
+
+  local homebrew_prefix="${HOMEBREW_PREFIX:-}"
+  local -a candidates
+
+  candidates=()
+
+  if [[ -n "$homebrew_prefix" ]]; then
+    candidates+=(
+      "$homebrew_prefix/share/zsh-completions"
+      "$homebrew_prefix/share/zsh/site-functions"
+    )
+  fi
+
+  case "${ZSH_OS:-unknown}" in
+    macos)
+      candidates+=(
+        "/opt/homebrew/share/zsh-completions"
+        "/opt/homebrew/share/zsh/site-functions"
+        "/usr/local/share/zsh-completions"
+      )
+      ;;
+    linux)
+      candidates+=(
+        "/usr/share/zsh/plugins/zsh-completions/src"
+        "/home/linuxbrew/.linuxbrew/share/zsh-completions"
+        "/home/linuxbrew/.linuxbrew/share/zsh/site-functions"
+      )
+      ;;
+  esac
+
+  candidates+=(
+    "/usr/local/share/zsh/site-functions"
+    "/usr/share/zsh/site-functions"
+    "/usr/local/share/zsh/vendor-completions"
+    "/usr/share/zsh/vendor-completions"
+  )
+
+  reply=("${candidates[@]}")
+}
+
+# 在 compinit 前接入系统和用户声明的补全目录
+zsh_completion_setup_fpath() {
+  emulate -L zsh
+
+  local dir
+  local -a candidates
+
+  candidates=()
+
+  if (( ${ZSH_COMPLETION_USE_SYSTEM_FPATHS:-1} )); then
+    zsh_completion_system_fpath_candidates
+    candidates+=("${reply[@]}")
+  fi
+
+  if (( ${+ZSH_COMPLETION_EXTRA_FPATHS} )); then
+    candidates+=("${ZSH_COMPLETION_EXTRA_FPATHS[@]}")
+  fi
+
+  for dir in "${candidates[@]}"; do
+    zsh_completion_append_fpath_dir "$dir"
+  done
+}
 
 # 确保 compdump 和 completion cache 目录存在
 zsh_ensure_dir "$ZSH_CACHE_DIR/compdump"
 zsh_ensure_dir "$ZSH_CACHE_DIR/completion"
 
 # compdump 文件名包含环境特征
-# 这样同一个仓库在不同平台或不同 zsh 版本下共用缓存时, 不容易互相污染
+# 防止不同平台或不同 zsh 版本共用 compdump
 local zver="${ZSH_VERSION//./_}"
 typeset -g ZSH_COMPDUMP="$ZSH_CACHE_DIR/compdump/zcompdump-${ZSH_OS}-${ZSH_ARCH}-${zver}"
 
 # menu select 依赖 zsh/complist
-# zmodload -i 的意思是
-# - 如果模块存在, 就加载
-# - 如果模块已经加载, 不报错
-# - 如果模块不存在, 返回失败但不至于像硬依赖一样把整个 shell 打挂
+# zmodload -i 行为
+# 如果模块存在 就加载
+# 如果模块已经加载 不报错
+# 模块缺失时只返回失败 避免硬中断 shell
 if (( ${ZSH_COMPLETION_MENU_SELECT:-1} )); then
   zmodload -i zsh/complist 2>/dev/null || true
 fi
 
-# 这里先设置和补全交互体验直接相关的 shell option
+zsh_completion_setup_fpath
+
+# 设置补全交互相关 shell option
 # 每个 option 都对应一个明确配置项
 (( ${ZSH_COMPLETION_AUTO_MENU:-1} )) && setopt AUTO_MENU || unsetopt AUTO_MENU
 (( ${ZSH_COMPLETION_COMPLETE_IN_WORD:-1} )) && setopt COMPLETE_IN_WORD || unsetopt COMPLETE_IN_WORD
 (( ${ZSH_COMPLETION_ALWAYS_TO_END:-1} )) && setopt ALWAYS_TO_END || unsetopt ALWAYS_TO_END
 
 # menu_complete 和 menu select 是两个不同语义
-# 这里主动关闭 menu_complete, 避免一按 Tab 就直接选中第一项, 保留更可控的菜单行为
+# 关闭 menu_complete 避免 Tab 直接选中第一项
 unsetopt MENU_COMPLETE
 
 # 加载并初始化补全系统
 autoload -Uz compinit
 compinit -d "$ZSH_COMPDUMP"
 
-# 如果用户明确要求兼容 bash completion, 这里再开启 bashcompinit
-# 这个能力有价值, 但会增加一点复杂度和启动成本
-# 所以默认关闭, 需要时再开
+# 用户明确要求兼容 bash completion 时开启 bashcompinit
+# bashcompinit 会增加一点复杂度和启动成本
+# 所以默认关闭 需要时再开
 if (( ${ZSH_COMPLETION_USE_BASHCOMPINIT:-0} )); then
   autoload -Uz bashcompinit
   bashcompinit
 fi
 
-# menu select 开启后, 这里额外给 menuselect keymap 绑定一个接受当前项的快捷键
+# 给 menuselect keymap 绑定接受当前项的快捷键
 # Shift-Tab 的反向菜单行为统一放在 keybinds feature 里处理
 if (( ${ZSH_COMPLETION_MENU_SELECT:-1} )); then
   zstyle ':completion:*:*:*:*:*' menu select
@@ -66,8 +138,8 @@ if (( ${ZSH_COMPLETION_MENU_SELECT:-1} )); then
 fi
 
 # 构造 matcher-list
-# 这里不直接把 matcher-list 写死成一个字符串, 而是按配置项逐段拼装
-# 好处是每种匹配能力都能单独关
+# matcher-list 按配置项逐段拼装
+# 每种匹配能力都能单独关
 local -a matcher_list
 matcher_list=()
 
@@ -81,7 +153,7 @@ if (( ${ZSH_COMPLETION_CASE_INSENSITIVE:-1} )); then
 fi
 
 # substring 匹配
-# 例如输入 down, 也能命中 Downloads
+# 例如输入 down 也能命中 Downloads
 if (( ${ZSH_COMPLETION_MATCH_SUBSTRING:-1} )); then
   matcher_list+=('r:|=*')
 fi
@@ -93,7 +165,7 @@ if (( ${ZSH_COMPLETION_MATCH_PARTIAL_WORD:-1} )); then
 fi
 
 # 只有在 matcher_list 非空时才设置 zstyle
-# 这样用户把所有匹配增强都关掉时, 就会退回更朴素的原生行为
+# 匹配增强全部关闭时退回原生行为
 if (( ${#matcher_list[@]} )); then
   zstyle ':completion:*' matcher-list "${matcher_list[@]}"
 fi
@@ -102,7 +174,7 @@ fi
 (( ${ZSH_COMPLETION_SPECIAL_DIRS:-1} )) && zstyle ':completion:*' special-dirs true
 
 # 启用 completion cache
-# 这对某些重补全场景更有价值, 例如包管理器和大命令集
+# 这对某些重补全场景更有价值 例如包管理器和大命令集
 if (( ${ZSH_COMPLETION_USE_CACHE:-1} )); then
   zstyle ':completion:*' use-cache yes
   zstyle ':completion:*' cache-path "$ZSH_CACHE_DIR/completion"
