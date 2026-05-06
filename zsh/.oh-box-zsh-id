@@ -1,5 +1,1 @@
-# 项目标识文件
-# 随 zsh/ 目录复制或链接到目标 ZDOTDIR
-# copy 模式不使用此文件判断新鲜度
-# 辅助人工排查和脚本识别 oh-box-zsh 副本
-oh-box-zsh-v2-ux
+# 标记此 zsh 目录属于 oh-box-zsh
