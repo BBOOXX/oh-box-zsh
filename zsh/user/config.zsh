@@ -14,6 +14,7 @@
 typeset -ga ZSH_LOGIN_FEATURES
 ZSH_LOGIN_FEATURES=(
   brew
+  rustup
   env-path
   pyenv
 )
