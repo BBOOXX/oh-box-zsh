@@ -813,6 +813,41 @@ path=("${TEST_TMUX_SAVED_PATH[@]}")
 rehash
 unfunction tmux 2>/dev/null || true
 
+log STEP "features/iterm2.zsh"
+
+HAD_ITERM2_HOME="${+HOME}"
+OLD_ITERM2_HOME="${HOME-}"
+HAD_ITERM2_ZDOTDIR="${+ZDOTDIR}"
+OLD_ITERM2_ZDOTDIR="${ZDOTDIR-}"
+HAD_ITERM2_GUARD="${+__zsh_feature_iterm2_loaded}"
+OLD_ITERM2_GUARD="${__zsh_feature_iterm2_loaded-}"
+
+typeset -g TEST_ITERM2_HOME="$TMPROOT/fake-iterm2-home"
+typeset -g TEST_ITERM2_ZDOTDIR="$TMPROOT/fake-iterm2-zdot"
+mkdir -p "$TEST_ITERM2_HOME" "$TEST_ITERM2_ZDOTDIR"
+
+HOME="$TEST_ITERM2_HOME"
+ZDOTDIR="$TEST_ITERM2_ZDOTDIR"
+unset __zsh_feature_iterm2_loaded TEST_ITERM2_MARK
+source "$REPO_ROOT/zsh/features/iterm2.zsh" || exit 1
+assert_eq "${TEST_ITERM2_MARK:-unset}" "unset" "iterm2 feature skips missing integration file"
+
+print -r -- 'typeset -g TEST_ITERM2_MARK=loaded_from_home' >| "$TEST_ITERM2_HOME/.iterm2_shell_integration.zsh"
+unset __zsh_feature_iterm2_loaded TEST_ITERM2_MARK
+source "$REPO_ROOT/zsh/features/iterm2.zsh" || exit 1
+assert_eq "${TEST_ITERM2_MARK:-unset}" "loaded_from_home" "iterm2 feature loads HOME integration file"
+
+/bin/rm -f "$TEST_ITERM2_HOME/.iterm2_shell_integration.zsh"
+print -r -- 'typeset -g TEST_ITERM2_MARK=loaded_from_zdotdir' >| "$TEST_ITERM2_ZDOTDIR/.iterm2_shell_integration.zsh"
+unset __zsh_feature_iterm2_loaded TEST_ITERM2_MARK
+source "$REPO_ROOT/zsh/features/iterm2.zsh" || exit 1
+assert_eq "${TEST_ITERM2_MARK:-unset}" "loaded_from_zdotdir" "iterm2 feature falls back to ZDOTDIR integration file"
+
+restore_var HOME "$HAD_ITERM2_HOME" "$OLD_ITERM2_HOME"
+restore_var ZDOTDIR "$HAD_ITERM2_ZDOTDIR" "$OLD_ITERM2_ZDOTDIR"
+restore_var __zsh_feature_iterm2_loaded "$HAD_ITERM2_GUARD" "$OLD_ITERM2_GUARD"
+unset TEST_ITERM2_MARK
+
 log STEP "features/completion.zsh"
 
 HAD_ZSH_COMPLETION_USE_SYSTEM_FPATHS="${+ZSH_COMPLETION_USE_SYSTEM_FPATHS}"

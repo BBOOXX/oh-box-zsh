@@ -30,6 +30,7 @@ ZSH_INTERACTIVE_FEATURES=(
   tmux
   keybinds
   prompt
+  iterm2
   autosuggestions
 )
 

@@ -36,6 +36,7 @@ assert_file "$REPO_ROOT/zsh/features/env-path.zsh" "features/env-path.zsh 存在
 assert_file "$REPO_ROOT/zsh/features/pyenv.zsh" "features/pyenv.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/z.zsh" "features/z.zsh 存在"
 assert_file "$REPO_ROOT/zsh/features/tmux.zsh" "features/tmux.zsh 存在"
+assert_file "$REPO_ROOT/zsh/features/iterm2.zsh" "features/iterm2.zsh 存在"
 assert_dir  "$REPO_ROOT/zsh/features" "features 目录存在"
 assert_dir  "$REPO_ROOT/test" "test 目录存在"
 assert_file "$REPO_ROOT/test/lib/assert.sh" "test/lib/assert.sh 存在"
