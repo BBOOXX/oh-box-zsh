@@ -160,5 +160,5 @@ zsh_brew_init() {
 zsh_brew_init
 
 alias bubo='brew update -v && brew outdated -v'
-alias bubc='brew upgrade && brew cleanup -v'
+alias bubc='brew upgrade --no-ask && brew cleanup -v'
 alias bubu='bubo && bubc'
