@@ -9,6 +9,10 @@
 
 # alias function bindkey 和临时代码放到 user/local.zsh
 
+# 保留 C locale 的默认格式, 同时支持 UTF-8 字符
+export LANG=C.UTF-8
+export LC_CTYPE=C.UTF-8
+
 # 默认给一个保守但可用的基线
 # login 只做轻量 PATH 基础层
 typeset -ga ZSH_LOGIN_FEATURES
@@ -16,7 +20,7 @@ ZSH_LOGIN_FEATURES=(
   brew
   rustup
   env-path
-  pyenv
+  #pyenv
 )
 
 # interactive 默认启用基础交互能力
@@ -25,7 +29,7 @@ typeset -ga ZSH_INTERACTIVE_FEATURES
 ZSH_INTERACTIVE_FEATURES=(
   history
   completion
-  pyenv
+  #pyenv
   z
   tmux
   keybinds
