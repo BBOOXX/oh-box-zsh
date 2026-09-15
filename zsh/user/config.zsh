@@ -9,6 +9,9 @@
 
 # alias function bindkey 和临时代码放到 user/local.zsh
 
+# 向子进程导出配置根目录, 保留外部已有设置
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+
 # 保留 C locale 的默认格式, 同时支持 UTF-8 字符
 export LANG=C.UTF-8
 export LC_CTYPE=C.UTF-8
