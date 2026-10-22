@@ -60,7 +60,7 @@ __zsh_z_reset_db() {
 }
 
 # 从缓存文件读回目录索引
-# 只接受三列纯文本格式 visits<TAB>last_access<TAB>path
+# 使用三列纯文本格式 path<TAB>visits<TAB>last_access
 __zsh_z_load_db() {
   emulate -L zsh
 
@@ -71,7 +71,7 @@ __zsh_z_load_db() {
 
   [[ -r "$file" ]] || return 0
 
-  while IFS=$'\t' read -r visits last_access dir; do
+  while IFS=$'\t' read -r dir visits last_access; do
     [[ "$visits" == <-> ]] || continue
     [[ "$last_access" == <-> ]] || continue
     __zsh_z_should_track_path "$dir" || continue
@@ -120,7 +120,7 @@ __zsh_z_save_db() {
 
   {
     for dir in "${(@ok)__zsh_z_scores}"; do
-      printf '%s\t%s\t%s\n' "${__zsh_z_scores[$dir]}" "${__zsh_z_times[$dir]:-0}" "$dir"
+      printf '%s\t%s\t%s\n' "$dir" "${__zsh_z_scores[$dir]}" "${__zsh_z_times[$dir]:-0}"
     done
   } >| "$tmp_file" || {
     rc=$?

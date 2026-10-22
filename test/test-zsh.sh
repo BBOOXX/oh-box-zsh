@@ -578,13 +578,27 @@ EOF
     fail "z completion 大小写无关验证失败"
   fi
 
-  if run_capture Z_RELOAD_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "__zsh_z_completion_candidates alpha >/dev/null; sleep 1; printf '%s\t%s\t%s\n' 7 9999999999 '$TRACK_GAMMA_REAL' >> '$RUNTIME_HOME/.cache/zsh/z/data'; __zsh_z_completion_candidates gamma; print -l -- \${reply[@]}"
+  if run_capture Z_RELOAD_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     "$ZSH_BIN" -ic "__zsh_z_completion_candidates alpha >/dev/null; sleep 1; printf '%s\t%s\t%s\n' '$TRACK_GAMMA_REAL' 7 9999999999 >> '$RUNTIME_HOME/.cache/zsh/z/data'; __zsh_z_completion_candidates gamma; print -l -- \${reply[@]}"
   then
     print_block "z completion reload" "$Z_RELOAD_OUT"
     assert_contains "$Z_RELOAD_OUT" "$TRACK_GAMMA_REAL" "z completion 会在数据文件变更后按需重载"
   else
     print_block "z completion reload" "$Z_RELOAD_OUT"
     fail "z completion 按需重载验证失败"
+  fi
+
+  Z_FORMAT_FILE="$TMPROOT/z-format-data"
+  Z_FORMAT_DIR="$RUNTIME_HOME/work format"
+  mkdir -p "$Z_FORMAT_DIR"
+  printf '%s\t%s\t%s\n' "$Z_FORMAT_DIR" 12 1700000000 > "$Z_FORMAT_FILE"
+
+  if run_capture Z_FORMAT_OUT env -i     HOME="$RUNTIME_HOME"     XDG_CONFIG_HOME="$RUNTIME_XDG"     PATH="$PATH"     ZSH_Z_DATA_FILE="$Z_FORMAT_FILE"     "$ZSH_BIN" -ic "z -l >/dev/null; cd '$TRACK_ALPHA'; cat '$Z_FORMAT_FILE'"
+  then
+    print_block "z data format" "$Z_FORMAT_OUT"
+    assert_contains "$Z_FORMAT_OUT" "$(printf '%s\t%s\t%s' "$Z_FORMAT_DIR" 12 1700000000)" "z 读写路径在前的新格式并保留空格路径 次数和时间"
+  else
+    print_block "z data format" "$Z_FORMAT_OUT"
+    fail "z 数据格式验证失败"
   fi
 fi
 
